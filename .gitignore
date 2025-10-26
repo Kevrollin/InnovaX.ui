@@ -89,9 +89,6 @@ temp/
 *.sln
 *.sw?
 
-# Vercel
-.vercel
-
 # TypeScript
 *.tsbuildinfo
 

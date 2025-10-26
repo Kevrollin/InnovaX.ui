@@ -20,8 +20,8 @@ export const Navbar = () => {
   const navigate = useNavigate();
 
   const getDashboardPath = () => {
-    if (user?.role === 'admin') return '/admin/dashboard';
-    if (user?.role === 'student') return '/student/dashboard';
+    if (user?.role === 'ADMIN') return '/admin/dashboard';
+    if (user?.role === 'STUDENT') return '/student/dashboard';
     return '/donor/dashboard';
   };
 

@@ -36,7 +36,7 @@ export const AdminRouteGuard = ({ children }: AdminRouteGuardProps) => {
       }
 
       // Check if user is admin
-      if (user && user.role !== 'admin') {
+      if (user && user.role !== 'ADMIN') {
         toast.error('Access denied. Admin privileges required.');
         navigate('/');
         return;
@@ -47,7 +47,7 @@ export const AdminRouteGuard = ({ children }: AdminRouteGuardProps) => {
   }, [user, token, isAuthenticated, navigate, logout]);
 
   // Show loading while validating
-  if (!isAuthenticated || !user || user.role !== 'admin') {
+  if (!isAuthenticated || !user || user.role !== 'ADMIN') {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>

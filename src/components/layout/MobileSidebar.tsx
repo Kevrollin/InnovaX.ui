@@ -34,8 +34,8 @@ export const MobileSidebar = ({ children }: MobileSidebarProps) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const getDashboardPath = () => {
-    if (user?.role === 'admin') return '/admin/dashboard';
-    if (user?.role === 'student') return '/student/dashboard';
+    if (user?.role === 'ADMIN') return '/admin/dashboard';
+    if (user?.role === 'STUDENT') return '/student/dashboard';
     return '/donor/dashboard';
   };
 

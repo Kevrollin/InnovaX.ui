@@ -11,13 +11,13 @@ export const AdminRedirect = ({ children }: AdminRedirectProps) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user && user.role === 'admin') {
+    if (user && user.role === 'ADMIN') {
       navigate('/admin/dashboard');
     }
   }, [user, navigate]);
 
   // If user is admin, don't render children (they'll be redirected)
-  if (user && user.role === 'admin') {
+  if (user && user.role === 'ADMIN') {
     return null;
   }
 
