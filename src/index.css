@@ -1,0 +1,115 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* FundHub Color System - Deep Navy + Stellar Cyan */
+    --background: 222 60% 8%;  /* Deep navy blue (#0A0E27) */
+    --foreground: 0 0% 100%;   /* White text */
+
+    --card: 222 45% 12%;       /* Slightly lighter navy for cards */
+    --card-foreground: 0 0% 100%;
+
+    --popover: 222 45% 12%;
+    --popover-foreground: 0 0% 100%;
+
+    --primary: 195 100% 46%;   /* Stellar cyan (#00A8E8) */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 222 50% 15%;  /* Secondary navy */
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 222 40% 20%;
+    --muted-foreground: 220 10% 70%;
+
+    --accent: 160 100% 39%;    /* Emerald green (#00C48C) */
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 222 40% 20%;
+    --input: 222 40% 18%;
+    --ring: 195 100% 46%;
+
+    --radius: 1rem;
+
+    /* Custom tokens */
+    --success: 160 100% 39%;   /* Emerald */
+    --light-bg: 220 17% 97%;   /* Light gray for sections */
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(195 100% 46%), hsl(195 100% 60%));
+    --gradient-accent: linear-gradient(135deg, hsl(160 100% 39%), hsl(160 100% 50%));
+    --gradient-dark: linear-gradient(180deg, hsl(222 60% 8%), hsl(222 60% 12%));
+    
+    /* Shadows */
+    --shadow-elegant: 0 10px 40px -10px hsl(222 60% 4% / 0.5);
+    --shadow-glow: 0 0 30px hsl(195 100% 46% / 0.3);
+    
+    /* Sidebar */
+    --sidebar-background: 222 55% 10%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 195 100% 46%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 222 50% 15%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 222 40% 20%;
+    --sidebar-ring: 195 100% 46%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+  }
+}
+
+@layer utilities {
+  .text-gradient-primary {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  .text-gradient-accent {
+    background: var(--gradient-accent);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  .shadow-elegant {
+    box-shadow: var(--shadow-elegant);
+  }
+  
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
