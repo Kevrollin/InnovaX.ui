@@ -90,7 +90,7 @@ class ApiService {
 
   // Auth endpoints
   async login(username: string, password: string) {
-    return this.request('/auth/login', {
+    return this.request('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
     });
@@ -103,7 +103,7 @@ class ApiService {
     fullName?: string;
     phone?: string;
   }) {
-    return this.request('/auth/signup', {
+    return this.request('/api/auth/signup', {
       method: 'POST',
       body: JSON.stringify(userData),
     });
@@ -121,7 +121,7 @@ class ApiService {
     idNumber?: string;
     estimatedGraduationYear?: number;
   }) {
-    return this.request('/auth/student-register', {
+    return this.request('/api/auth/student-register', {
       method: 'POST',
       body: JSON.stringify(studentData),
     });
@@ -135,14 +135,14 @@ class ApiService {
   }
 
   async getUserProfile() {
-    return this.request('/auth/profile');
+    return this.request('/api/auth/profile');
   }
 
   async updateProfile(profileData: {
     fullName?: string;
     phone?: string;
   }) {
-    return this.request('/auth/profile', {
+    return this.request('/api/auth/profile', {
       method: 'PUT',
       body: JSON.stringify(profileData),
     });
@@ -162,31 +162,31 @@ class ApiService {
     if (params?.sort) queryParams.append('sort', params.sort);
 
     const queryString = queryParams.toString();
-    const endpoint = queryString ? `/projects?${queryString}` : '/projects';
+    const endpoint = queryString ? `/api/projects?${queryString}` : '/api/projects';
     
     return this.request(endpoint);
   }
 
   async getProject(id: string) {
-    return this.request(`/projects/${id}`);
+    return this.request(`/api/projects/${id}`);
   }
 
   async createProject(projectData: any) {
-    return this.request('/projects', {
+    return this.request('/api/projects', {
       method: 'POST',
       body: JSON.stringify(projectData),
     });
   }
 
   async updateProject(id: string, projectData: any) {
-    return this.request(`/projects/${id}`, {
+    return this.request(`/api/projects/${id}`, {
       method: 'PUT',
       body: JSON.stringify(projectData),
     });
   }
 
   async deleteProject(id: string) {
-    return this.request(`/projects/${id}`, {
+    return this.request(`/api/projects/${id}`, {
       method: 'DELETE',
     });
   }
@@ -201,13 +201,13 @@ class ApiService {
     if (params?.status) queryParams.append('status', params.status);
 
     const queryString = queryParams.toString();
-    const endpoint = queryString ? `/campaigns?${queryString}` : '/campaigns';
+    const endpoint = queryString ? `/api/campaigns?${queryString}` : '/api/campaigns';
     
     return this.request(endpoint);
   }
 
   async getCampaign(id: string) {
-    return this.request(`/campaigns/${id}`);
+    return this.request(`/api/campaigns/${id}`);
   }
 
   // Donation endpoints
@@ -222,13 +222,13 @@ class ApiService {
     if (params?.status) queryParams.append('status', params.status);
 
     const queryString = queryParams.toString();
-    const endpoint = queryString ? `/donations?${queryString}` : '/donations';
+    const endpoint = queryString ? `/api/donations?${queryString}` : '/api/donations';
     
     return this.request(endpoint);
   }
 
   async createDonation(donationData: any) {
-    return this.request('/donations', {
+    return this.request('/api/donations', {
       method: 'POST',
       body: JSON.stringify(donationData),
     });
@@ -250,54 +250,54 @@ class ApiService {
     if (params?.authorId) queryParams.append('authorId', params.authorId.toString());
 
     const queryString = queryParams.toString();
-    const endpoint = queryString ? `/posts?${queryString}` : '/posts';
+    const endpoint = queryString ? `/api/posts?${queryString}` : '/api/posts';
     
     return this.request(endpoint);
   }
 
   async getPost(id: string) {
-    return this.request(`/posts/${id}`);
+    return this.request(`/api/posts/${id}`);
   }
 
   async createPost(postData: any) {
-    return this.request('/posts', {
+    return this.request('/api/posts', {
       method: 'POST',
       body: JSON.stringify(postData),
     });
   }
 
   async updatePost(id: string, postData: any) {
-    return this.request(`/posts/${id}`, {
+    return this.request(`/api/posts/${id}`, {
       method: 'PUT',
       body: JSON.stringify(postData),
     });
   }
 
   async deletePost(id: string) {
-    return this.request(`/posts/${id}`, {
+    return this.request(`/api/posts/${id}`, {
       method: 'DELETE',
     });
   }
 
   async likePost(id: string) {
-    return this.request(`/posts/${id}/like`, {
+    return this.request(`/api/posts/${id}/like`, {
       method: 'POST',
     });
   }
 
   async sharePost(id: string) {
-    return this.request(`/posts/${id}/share`, {
+    return this.request(`/api/posts/${id}/share`, {
       method: 'POST',
     });
   }
 
   // Wallet endpoints
   async getWallet() {
-    return this.request('/wallets');
+    return this.request('/api/wallets');
   }
 
   async connectWallet(walletData: any) {
-    return this.request('/wallets/connect', {
+    return this.request('/api/wallets/connect', {
       method: 'POST',
       body: JSON.stringify(walletData),
     });
@@ -305,34 +305,34 @@ class ApiService {
 
   // Admin endpoints
   async getPendingVerifications() {
-    return this.request('/admin/verifications');
+    return this.request('/api/admin/verifications');
   }
 
   async approveVerification(id: string) {
-    return this.request(`/admin/verify-student`, {
+    return this.request(`/api/admin/verify-student`, {
       method: 'POST',
       body: JSON.stringify({ user_id: parseInt(id), approve: true }),
     });
   }
 
   async rejectVerification(id: string) {
-    return this.request(`/admin/verify-student`, {
+    return this.request(`/api/admin/verify-student`, {
       method: 'POST',
       body: JSON.stringify({ user_id: parseInt(id), approve: false }),
     });
   }
 
   async getAnalytics() {
-    return this.request('/admin/stats');
+    return this.request('/api/admin/stats');
   }
 
   // Student endpoints
   async getStudentProfile() {
-    return this.request('/students/profile');
+    return this.request('/api/students/profile');
   }
 
   async updateStudentProfile(profileData: any) {
-    return this.request('/students/profile', {
+    return this.request('/api/students/profile', {
       method: 'PUT',
       body: JSON.stringify(profileData),
     });
