@@ -17,7 +17,8 @@ import {
   BarChart3,
   UserCheck,
   Activity,
-  Wallet
+  Wallet,
+  Megaphone
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -37,6 +38,7 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
     { name: 'User Management', href: '/admin/users', icon: Users },
     { name: 'Student Verifications', href: '/admin/verifications', icon: UserCheck },
     { name: 'Projects', href: '/admin/projects', icon: FileText },
+    { name: 'Campaigns', href: '/admin/campaigns', icon: Megaphone },
     { name: 'Donations', href: '/admin/donations', icon: DollarSign },
     { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
     { name: 'Activity Logs', href: '/admin/logs', icon: Activity },
@@ -50,8 +52,9 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
       {/* Mobile sidebar */}
       <div className={`fixed inset-0 z-50 lg:hidden ${sidebarOpen ? 'block' : 'hidden'}`}>
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
-        <div className="fixed inset-y-0 left-0 flex w-72 flex-col bg-card border-r border-border shadow-2xl">
-          <div className="flex h-16 items-center justify-between px-6 border-b border-border">
+        <div className="fixed inset-y-0 left-0 flex w-72 flex-col bg-card border-r border-border shadow-2xl h-full">
+          {/* Header */}
+          <div className="flex h-16 items-center justify-between px-6 border-b border-border flex-shrink-0">
             <div className="flex items-center space-x-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
                 <Wallet className="h-6 w-6 text-primary-foreground" />
@@ -72,7 +75,9 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
               <X className="h-5 w-5" />
             </Button>
           </div>
-          <nav className="flex-1 space-y-2 px-4 py-6">
+          
+          {/* Scrollable Navigation */}
+          <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-2 min-h-0">
             {navigation.map((item) => (
               <Link
                 key={item.name}
@@ -89,7 +94,9 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
               </Link>
             ))}
           </nav>
-          <div className="border-t border-border p-4">
+          
+          {/* User Profile & Logout - Fixed at bottom */}
+          <div className="border-t border-border p-4 flex-shrink-0 bg-card">
             <div className="flex items-center space-x-3 mb-4">
               <Avatar className="h-10 w-10">
                 <AvatarFallback className="bg-primary text-primary-foreground">
@@ -110,7 +117,7 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
               variant="ghost"
               size="sm"
               onClick={handleLogout}
-              className="w-full justify-start text-muted-foreground hover:text-foreground"
+              className="w-full justify-start text-muted-foreground hover:text-foreground hover:bg-secondary"
             >
               <LogOut className="mr-2 h-4 w-4" />
               Sign out
@@ -121,8 +128,9 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
 
       {/* Desktop sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-72 lg:flex-col">
-        <div className="flex flex-col flex-grow bg-card border-r border-border">
-          <div className="flex h-16 items-center px-6 border-b border-border">
+        <div className="flex flex-col flex-grow bg-card border-r border-border h-full">
+          {/* Header */}
+          <div className="flex h-16 items-center px-6 border-b border-border flex-shrink-0">
             <div className="flex items-center space-x-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
                 <Wallet className="h-6 w-6 text-primary-foreground" />
@@ -135,7 +143,9 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
               </div>
             </div>
           </div>
-          <nav className="flex-1 space-y-2 px-4 py-6">
+          
+          {/* Scrollable Navigation */}
+          <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-2 min-h-0">
             {navigation.map((item) => (
               <Link
                 key={item.name}
@@ -151,7 +161,9 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
               </Link>
             ))}
           </nav>
-          <div className="border-t border-border p-4">
+          
+          {/* User Profile & Logout - Fixed at bottom */}
+          <div className="border-t border-border p-4 flex-shrink-0 bg-card">
             <div className="flex items-center space-x-3 mb-4">
               <Avatar className="h-10 w-10">
                 <AvatarFallback className="bg-primary text-primary-foreground">
@@ -172,7 +184,7 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
               variant="ghost"
               size="sm"
               onClick={handleLogout}
-              className="w-full justify-start text-muted-foreground hover:text-foreground"
+              className="w-full justify-start text-muted-foreground hover:text-foreground hover:bg-secondary"
             >
               <LogOut className="mr-2 h-4 w-4" />
               Sign out

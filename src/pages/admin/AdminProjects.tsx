@@ -32,45 +32,13 @@ import {
   Edit,
   Trash2,
   Heart,
-  Share2
+  Share2,
+  AlertTriangle
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { projectsAPI } from '@/services/projects';
+import { adminAPI } from '@/services/admin';
+import { Project } from '@/types';
 import ProjectDetailsModal from '@/components/admin/ProjectDetailsModal';
-
-interface Project {
-  id: number;
-  owner_id: number;
-  title: string;
-  description: string;
-  short_description?: string;
-  repo_url?: string;
-  demo_url?: string;
-  website_url?: string;
-  funding_goal: number;
-  currency: string;
-  tags?: string[];
-  category?: string;
-  difficulty_level?: string;
-  status: string;
-  is_featured: boolean;
-  is_public: boolean;
-  funding_raised: number;
-  views_count: number;
-  likes_count: number;
-  shares_count: number;
-  screenshots?: string[];
-  videos?: string[];
-  documents?: string[];
-  created_at: string;
-  updated_at?: string;
-  published_at?: string;
-  owner?: {
-    id: number;
-    username: string;
-    full_name?: string;
-  };
-}
 
 const AdminProjects = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -81,134 +49,89 @@ const AdminProjects = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [projects, setProjects] = useState<Project[]>([]);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock data - replace with actual API calls
-  const mockProjects: Project[] = [
-    {
-      id: 1,
-      owner_id: 1,
-      title: 'AI-Powered Study Assistant',
-      description: 'An intelligent study companion that helps students organize their learning materials and track progress.',
-      short_description: 'Smart study companion for students',
-      repo_url: 'https://github.com/student/ai-study-assistant',
-      demo_url: 'https://demo.example.com',
-      website_url: 'https://project.example.com',
-      funding_goal: 5000,
-      currency: 'XLM',
-      tags: ['AI', 'Education', 'Machine Learning'],
-      category: 'Technology',
-      difficulty_level: 'intermediate',
-      status: 'published',
-      is_featured: true,
-      is_public: true,
-      funding_raised: 2500,
-      views_count: 1250,
-      likes_count: 89,
-      shares_count: 23,
-      screenshots: ['screenshot1.jpg', 'screenshot2.jpg'],
-      videos: ['demo.mp4'],
-      documents: ['proposal.pdf', 'technical_specs.pdf'],
-      created_at: '2024-01-15T10:30:00Z',
-      updated_at: '2024-01-20T14:22:00Z',
-      published_at: '2024-01-16T09:15:00Z',
-      owner: {
-        id: 1,
-        username: 'john_student',
-        full_name: 'John Doe'
-      }
-    },
-    {
-      id: 2,
-      owner_id: 2,
-      title: 'Sustainable Energy Monitor',
-      description: 'A device that monitors energy consumption and suggests ways to reduce environmental impact.',
-      short_description: 'Energy monitoring for sustainability',
-      repo_url: 'https://github.com/student/energy-monitor',
-      funding_goal: 3000,
-      currency: 'XLM',
-      tags: ['IoT', 'Sustainability', 'Hardware'],
-      category: 'Environment',
-      difficulty_level: 'advanced',
-      status: 'pending_review',
-      is_featured: false,
-      is_public: true,
-      funding_raised: 0,
-      views_count: 45,
-      likes_count: 12,
-      shares_count: 3,
-      created_at: '2024-01-18T11:20:00Z',
-      updated_at: '2024-01-18T11:20:00Z',
-      owner: {
-        id: 2,
-        username: 'jane_smith',
-        full_name: 'Jane Smith'
-      }
-    },
-    {
-      id: 3,
-      owner_id: 3,
-      title: 'Community Garden App',
-      description: 'An app that connects local gardeners and helps manage community garden spaces.',
-      short_description: 'Connect local gardeners',
-      funding_goal: 2000,
-      currency: 'XLM',
-      tags: ['Mobile', 'Community', 'Agriculture'],
-      category: 'Social',
-      difficulty_level: 'beginner',
-      status: 'funded',
-      is_featured: false,
-      is_public: true,
-      funding_raised: 2000,
-      views_count: 890,
-      likes_count: 67,
-      shares_count: 15,
-      created_at: '2024-01-10T08:45:00Z',
-      updated_at: '2024-01-25T16:30:00Z',
-      published_at: '2024-01-11T10:00:00Z',
-      owner: {
-        id: 3,
-        username: 'mike_wilson',
-        full_name: 'Mike Wilson'
-      }
+  // Map admin project to main Project type
+  const mapAdminProjectToProject = (adminProject: any): Project => ({
+    id: adminProject.id,
+    owner_id: adminProject.creatorId,
+    title: adminProject.title,
+    description: adminProject.description,
+    short_description: adminProject.short_description,
+    repo_url: adminProject.repo_url,
+    demo_url: adminProject.demo_url,
+    website_url: adminProject.website_url,
+    funding_goal: adminProject.goalAmount,
+    currency: 'XLM',
+    tags: adminProject.tags || [],
+    category: adminProject.category?.toLowerCase(),
+    difficulty_level: adminProject.difficulty_level,
+    milestones: adminProject.milestones || [],
+    status: adminProject.status.toLowerCase(),
+    is_featured: adminProject.is_featured || false,
+    is_public: true,
+    funding_raised: adminProject.currentAmount || 0,
+    views_count: adminProject.views_count || 0,
+    likes_count: adminProject.likes_count || 0,
+    shares_count: adminProject.shares_count || 0,
+    screenshots: adminProject.screenshots || [],
+    videos: adminProject.videos || [],
+    documents: adminProject.documents || [],
+    created_at: adminProject.createdAt,
+    updated_at: adminProject.updatedAt,
+    published_at: adminProject.published_at,
+    owner: {
+      id: adminProject.creator?.id || adminProject.creatorId,
+      username: adminProject.creator?.username || '',
+      full_name: adminProject.creator?.fullName
     }
-  ];
+  });
+
+  // Fetch projects from API
+  const fetchProjects = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await adminAPI.getAllProjects({
+        search: searchTerm || undefined,
+        status: filterStatus !== 'all' ? filterStatus : undefined,
+        category: filterCategory !== 'all' ? filterCategory : undefined,
+        limit: 50
+      });
+      setProjects((response.data || []).map(mapAdminProjectToProject));
+    } catch (error) {
+      console.error('Failed to fetch projects:', error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch projects');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchProjects = async () => {
-      try {
-        // Mock API call - replace with actual implementation
-        setProjects(mockProjects);
-      } catch (error) {
-        console.error('Failed to fetch projects:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchProjects();
-  }, []);
+  }, [searchTerm, filterStatus, filterCategory]);
 
-  const filteredProjects = projects.filter(project => {
+  const filteredProjects = (projects || []).filter(project => {
     const matchesSearch = project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          project.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (project.owner?.username && project.owner.username.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesStatus = filterStatus === 'all' || project.status === filterStatus;
+    const matchesStatus = filterStatus === 'all' || project.status === filterStatus.toLowerCase();
     const matchesCategory = filterCategory === 'all' || project.category === filterCategory;
     return matchesSearch && matchesStatus && matchesCategory;
   });
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'published':
-        return <Badge variant="default" className="bg-success text-white"><CheckCircle className="h-3 w-3 mr-1" />Published</Badge>;
-      case 'funded':
+      case 'ACTIVE':
+        return <Badge variant="default" className="bg-green-600 text-white"><CheckCircle className="h-3 w-3 mr-1" />Active</Badge>;
+      case 'FUNDED':
         return <Badge variant="default" className="bg-primary text-white"><DollarSign className="h-3 w-3 mr-1" />Funded</Badge>;
-      case 'pending_review':
-        return <Badge variant="secondary"><Clock className="h-3 w-3 mr-1" />Pending Review</Badge>;
-      case 'draft':
-        return <Badge variant="outline"><Edit className="h-3 w-3 mr-1" />Draft</Badge>;
-      case 'archived':
-        return <Badge variant="destructive"><Ban className="h-3 w-3 mr-1" />Archived</Badge>;
+      case 'DRAFT':
+        return <Badge variant="secondary"><Clock className="h-3 w-3 mr-1" />Draft</Badge>;
+      case 'COMPLETED':
+        return <Badge variant="default" className="bg-green-600 text-white"><CheckCircle className="h-3 w-3 mr-1" />Completed</Badge>;
+      case 'CANCELLED':
+        return <Badge variant="destructive"><Ban className="h-3 w-3 mr-1" />Cancelled</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -230,35 +153,32 @@ const AdminProjects = () => {
   const handleProjectAction = async (projectId: number, action: string) => {
     setActionLoading(projectId);
     try {
-      // Mock API call - replace with actual implementation
-      console.log(`Performing ${action} on project ${projectId}`);
+      if (action === 'ACTIVE' || action === 'FUNDED' || action === 'COMPLETED' || action === 'CANCELLED') {
+        await adminAPI.updateProjectStatus(projectId, action);
+      } else if (action === 'delete') {
+        await adminAPI.deleteProject(projectId);
+      }
       
-      // Update local state
-      setProjects(prev => prev.map(project => 
-        project.id === projectId 
-          ? { 
-              ...project, 
-              status: action,
-              updated_at: new Date().toISOString()
-            }
-          : project
-      ));
-      
+      // Refresh the projects list
+      await fetchProjects();
       setIsDetailsOpen(false);
     } catch (error) {
       console.error(`Failed to ${action} project:`, error);
+      setError(error instanceof Error ? error.message : `Failed to ${action} project`);
     } finally {
       setActionLoading(null);
     }
   };
 
   const getStatusCounts = () => {
+    const projectsList = projects || [];
     return {
-      all: projects.length,
-      published: projects.filter(p => p.status === 'published').length,
-      pending_review: projects.filter(p => p.status === 'pending_review').length,
-      funded: projects.filter(p => p.status === 'funded').length,
-      draft: projects.filter(p => p.status === 'draft').length,
+      all: projectsList.length,
+      ACTIVE: projectsList.filter(p => p.status === 'published').length,
+      DRAFT: projectsList.filter(p => p.status === 'draft').length,
+      FUNDED: projectsList.filter(p => p.status === 'funded').length,
+      COMPLETED: projectsList.filter(p => p.status === 'completed').length,
+      CANCELLED: projectsList.filter(p => p.status === 'archived').length,
     };
   };
 
@@ -290,13 +210,31 @@ const AdminProjects = () => {
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={fetchProjects}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
           </div>
         </div>
       </motion.div>
+
+      {/* Error Display */}
+      {error && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <Card className="border-red-200 bg-red-50">
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2 text-red-800">
+                <AlertTriangle className="h-4 w-4" />
+                <span className="text-sm font-medium">Error: {error}</span>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Stats Cards */}
       <motion.div
@@ -321,7 +259,7 @@ const AdminProjects = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Published</p>
-                  <p className="text-2xl font-bold text-foreground">{statusCounts.published}</p>
+                  <p className="text-2xl font-bold text-foreground">{statusCounts.ACTIVE}</p>
                 </div>
                 <CheckCircle className="h-8 w-8 text-success" />
               </div>
@@ -332,7 +270,7 @@ const AdminProjects = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Pending Review</p>
-                  <p className="text-2xl font-bold text-foreground">{statusCounts.pending_review}</p>
+                  <p className="text-2xl font-bold text-foreground">{statusCounts.DRAFT}</p>
                 </div>
                 <Clock className="h-8 w-8 text-orange-500" />
               </div>
@@ -343,7 +281,7 @@ const AdminProjects = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Funded</p>
-                  <p className="text-2xl font-bold text-foreground">{statusCounts.funded}</p>
+                  <p className="text-2xl font-bold text-foreground">{statusCounts.FUNDED}</p>
                 </div>
                 <DollarSign className="h-8 w-8 text-primary" />
               </div>
@@ -385,25 +323,25 @@ const AdminProjects = () => {
                   All ({statusCounts.all})
                 </Button>
                 <Button
-                  variant={filterStatus === 'published' ? 'default' : 'outline'}
-                  onClick={() => setFilterStatus('published')}
-                  className={filterStatus === 'published' ? 'bg-primary text-primary-foreground' : ''}
+                  variant={filterStatus === 'ACTIVE' ? 'default' : 'outline'}
+                  onClick={() => setFilterStatus('ACTIVE')}
+                  className={filterStatus === 'ACTIVE' ? 'bg-primary text-primary-foreground' : ''}
                 >
-                  Published ({statusCounts.published})
+                  Published ({statusCounts.ACTIVE})
                 </Button>
                 <Button
-                  variant={filterStatus === 'pending_review' ? 'default' : 'outline'}
-                  onClick={() => setFilterStatus('pending_review')}
-                  className={filterStatus === 'pending_review' ? 'bg-primary text-primary-foreground' : ''}
+                  variant={filterStatus === 'DRAFT' ? 'default' : 'outline'}
+                  onClick={() => setFilterStatus('DRAFT')}
+                  className={filterStatus === 'DRAFT' ? 'bg-primary text-primary-foreground' : ''}
                 >
-                  Pending ({statusCounts.pending_review})
+                  Pending ({statusCounts.DRAFT})
                 </Button>
                 <Button
-                  variant={filterStatus === 'funded' ? 'default' : 'outline'}
-                  onClick={() => setFilterStatus('funded')}
-                  className={filterStatus === 'funded' ? 'bg-primary text-primary-foreground' : ''}
+                  variant={filterStatus === 'FUNDED' ? 'default' : 'outline'}
+                  onClick={() => setFilterStatus('FUNDED')}
+                  className={filterStatus === 'FUNDED' ? 'bg-primary text-primary-foreground' : ''}
                 >
-                  Funded ({statusCounts.funded})
+                  Funded ({statusCounts.FUNDED})
                 </Button>
               </div>
             </div>
@@ -451,7 +389,7 @@ const AdminProjects = () => {
                           <div className="min-w-0 flex-1">
                             <div className="font-medium text-foreground truncate">{project.title}</div>
                             <div className="text-sm text-muted-foreground truncate">
-                              {project.short_description || project.description.substring(0, 50)}...
+                              {project.description.substring(0, 50)}...
                             </div>
                             <div className="flex items-center space-x-2 mt-1">
                               {project.is_featured && (
@@ -474,29 +412,15 @@ const AdminProjects = () => {
                       <TableCell>
                         <div>
                           <div className="text-foreground">{project.category || 'Uncategorized'}</div>
-                          {project.tags && project.tags.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {project.tags.slice(0, 2).map((tag, index) => (
-                                <Badge key={index} variant="outline" className="text-xs">
-                                  {tag}
-                                </Badge>
-                              ))}
-                              {project.tags.length > 2 && (
-                                <Badge variant="outline" className="text-xs">
-                                  +{project.tags.length - 2}
-                                </Badge>
-                              )}
-                            </div>
-                          )}
                         </div>
                       </TableCell>
                       <TableCell>
                         <div>
                           <div className="text-foreground font-medium">
-                            {project.funding_raised.toLocaleString()} / {project.funding_goal.toLocaleString()} {project.currency}
+                            {project.funding_raised?.toLocaleString() || '0'} / {project.funding_goal?.toLocaleString() || '0'} XLM
                           </div>
                           <div className="text-sm text-muted-foreground">
-                            {Math.round((project.funding_raised / project.funding_goal) * 100)}% funded
+                            {project.funding_goal > 0 ? Math.round(((project.funding_raised || 0) / project.funding_goal) * 100) : 0}% funded
                           </div>
                         </div>
                       </TableCell>

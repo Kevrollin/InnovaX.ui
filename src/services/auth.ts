@@ -42,7 +42,7 @@ export const authAPI = {
   async login(credentials: LoginRequest): Promise<LoginResponse> {
     try {
       const response = await apiService.login(credentials.username, credentials.password);
-      return response.data;
+      return response.data; // Backend returns { success: true, data: { access_token, token_type, user } }
     } catch (error) {
       console.error('Login error:', error);
       const friendlyError = new Error(getUserFriendlyMessage(error));
@@ -54,7 +54,7 @@ export const authAPI = {
   async signup(userData: SignupRequest): Promise<User> {
     try {
       const response = await apiService.signup(userData);
-      return response.data;
+      return response.data; // Backend returns { success: true, data: user }
     } catch (error) {
       console.error('Signup error:', error);
       const friendlyError = new Error(getUserFriendlyMessage(error));
@@ -66,7 +66,7 @@ export const authAPI = {
   async signupStudent(studentData: StudentSignupRequest): Promise<User> {
     try {
       const response = await apiService.signupStudent(studentData);
-      return response.data;
+      return response.data; // Backend returns { success: true, data: user }
     } catch (error) {
       console.error('Student signup error:', error);
       const friendlyError = new Error(getUserFriendlyMessage(error));
@@ -78,7 +78,7 @@ export const authAPI = {
   async getUserProfile(): Promise<User> {
     try {
       const response = await apiService.getUserProfile();
-      return response.data;
+      return response.data; // Backend returns { success: true, data: user }
     } catch (error) {
       console.error('Get user profile error:', error);
       const friendlyError = new Error(getUserFriendlyMessage(error));
@@ -105,7 +105,7 @@ export const authAPI = {
   async updateProfile(profileData: UpdateProfileRequest): Promise<User> {
     try {
       const response = await apiService.updateProfile(profileData);
-      return response.data;
+      return response.data; // Backend returns { success: true, data: user }
     } catch (error) {
       console.error('Update profile error:', error);
       const friendlyError = new Error(getUserFriendlyMessage(error));

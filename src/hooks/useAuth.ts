@@ -1,12 +1,15 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { authAPI } from '@/services/auth';
 import { UserRole } from '@/types';
 import { getSuccessMessage } from '@/utils/errorHandler';
 import { showSuccessToast } from '@/components/ui/enhanced-toast';
+import { toast } from '@/hooks/use-toast';
 
 export const useAuth = () => {
   const { user, token, isAuthenticated, login, logout, setUser } = useAuthStore();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastRefreshTime, setLastRefreshTime] = useState(0);
 
   // Initialize auth state from localStorage on mount
   useEffect(() => {
@@ -51,13 +54,31 @@ export const useAuth = () => {
   const refreshUserProfile = async () => {
     if (!token) return;
     
+    // Rate limiting: only refresh if it's been more than 30 seconds since last refresh
+    const now = Date.now();
+    if (isRefreshing || (now - lastRefreshTime < 30000)) {
+      return;
+    }
+    
+    setIsRefreshing(true);
+    setLastRefreshTime(now);
+    
     try {
       const userProfile = await authAPI.getUserProfile();
       setUser(userProfile);
     } catch (error) {
       console.error('Failed to refresh user profile:', error);
-      logout();
-      toast.error('Session expired. Please login again.');
+      // Only logout if it's an authentication error, not rate limiting
+      if (error instanceof Error && error.message.includes('401')) {
+        logout();
+        toast({
+          title: "Session Expired",
+          description: "Please login again.",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -75,7 +96,17 @@ export const useAuth = () => {
 
   // Check if user is verified student
   const isVerifiedStudent = () => {
-    return isStudent() && user?.studentProfile?.verificationStatus === 'verified';
+    return isStudent() && user?.studentProfile?.verificationStatus === 'APPROVED';
+  };
+
+  // Check if user is pending verification
+  const isPendingVerification = () => {
+    return isStudent() && user?.studentProfile?.verificationStatus === 'PENDING';
+  };
+
+  // Check if user verification was rejected
+  const isVerificationRejected = () => {
+    return isStudent() && user?.studentProfile?.verificationStatus === 'REJECTED';
   };
 
   // Get user dashboard route based on role
@@ -115,6 +146,8 @@ export const useAuth = () => {
     hasRole,
     hasAnyRole,
     isVerifiedStudent,
+    isPendingVerification,
+    isVerificationRejected,
     getDashboardRoute,
   };
 };

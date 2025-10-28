@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import { StudentProfileCard } from '@/components/ui/StudentProfileCard';
 import { 
   User, 
@@ -29,15 +30,19 @@ import {
   Gift,
   TrendingUp,
   GraduationCap,
-  BookOpen
+  BookOpen,
+  Clock,
+  XCircle
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuthStore } from '@/store/authStore';
+import { useAuth } from '@/hooks/useAuth';
 import { authAPI } from '@/services/auth';
 import { toast } from 'sonner';
 
 const StudentProfile = () => {
   const { user, setUser } = useAuthStore();
+  const { isVerifiedStudent, isPendingVerification, isVerificationRejected, refreshUserProfile } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -259,6 +264,68 @@ const StudentProfile = () => {
                 </TabsContent>
 
                 <TabsContent value="academic" className="space-y-6">
+                  {/* Verification Status Card */}
+                  <Card className={`border-border ${
+                    isVerifiedStudent() ? 'border-green-500/20 bg-green-500/5' :
+                    isPendingVerification() ? 'border-yellow-500/20 bg-yellow-500/5' :
+                    isVerificationRejected() ? 'border-red-500/20 bg-red-500/5' :
+                    'border-gray-500/20 bg-gray-500/5'
+                  }`}>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Shield className="h-5 w-5" />
+                        Verification Status
+                      </CardTitle>
+                      <CardDescription>
+                        Your student verification status
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          {isVerifiedStudent() ? (
+                            <CheckCircle className="h-6 w-6 text-green-500" />
+                          ) : isPendingVerification() ? (
+                            <Clock className="h-6 w-6 text-yellow-500" />
+                          ) : isVerificationRejected() ? (
+                            <XCircle className="h-6 w-6 text-red-500" />
+                          ) : (
+                            <AlertCircle className="h-6 w-6 text-gray-500" />
+                          )}
+                          <div>
+                            <p className="font-semibold">
+                              {isVerifiedStudent() ? 'Verified Student' :
+                               isPendingVerification() ? 'Pending Verification' :
+                               isVerificationRejected() ? 'Verification Rejected' :
+                               'Not Verified'}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {isVerifiedStudent() ? 'You can create projects and access all student features' :
+                               isPendingVerification() ? 'Your profile is under review by admin team' :
+                               isVerificationRejected() ? 'Please update your profile and reapply' :
+                               'Complete your student profile to get verified'}
+                            </p>
+                          </div>
+                        </div>
+                        <Badge className={
+                          isVerifiedStudent() ? 'bg-green-500/10 text-green-500 border-green-500/20' :
+                          isPendingVerification() ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' :
+                          isVerificationRejected() ? 'bg-red-500/10 text-red-500 border-red-500/20' :
+                          'bg-gray-500/10 text-gray-500 border-gray-500/20'
+                        }>
+                          {user?.studentProfile?.verificationStatus || 'PENDING'}
+                        </Badge>
+                      </div>
+                      {user?.studentProfile?.verifiedAt && (
+                        <div className="mt-4 pt-4 border-t border-border">
+                          <p className="text-sm text-muted-foreground">
+                            Verified on: {new Date(user.studentProfile.verifiedAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
                   <Card className="border-border">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">

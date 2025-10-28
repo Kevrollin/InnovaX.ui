@@ -86,110 +86,33 @@ const AdminDonations = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [donations, setDonations] = useState<Donation[]>([]);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Mock data - replace with actual API calls
-  const mockDonations: Donation[] = [
-    {
-      id: 1,
-      donor_id: 1,
-      project_id: 1,
-      amount: 100,
-      currency: 'XLM',
-      status: 'completed',
-      transaction_hash: '0x1234567890abcdef',
-      stellar_transaction_id: 'stellar_tx_123456',
-      payment_method: 'stellar',
-      is_anonymous: false,
-      message: 'Great project! Keep up the good work.',
-      created_at: '2024-01-20T10:30:00Z',
-      updated_at: '2024-01-20T10:30:00Z',
-      donor: {
-        id: 1,
-        username: 'alice_donor',
-        full_name: 'Alice Johnson',
-        email: 'alice@example.com'
-      },
-      project: {
-        id: 1,
-        title: 'AI-Powered Study Assistant',
-        owner_id: 1,
-        owner: {
-          id: 1,
-          username: 'john_student',
-          full_name: 'John Doe'
-        }
-      }
-    },
-    {
-      id: 2,
-      donor_id: 2,
-      project_id: 2,
-      amount: 250,
-      currency: 'XLM',
-      status: 'pending',
-      payment_method: 'stellar',
-      is_anonymous: true,
-      created_at: '2024-01-21T14:22:00Z',
-      donor: {
-        id: 2,
-        username: 'bob_supporter',
-        full_name: 'Bob Smith',
-        email: 'bob@example.com'
-      },
-      project: {
-        id: 2,
-        title: 'Sustainable Energy Monitor',
-        owner_id: 2,
-        owner: {
-          id: 2,
-          username: 'jane_smith',
-          full_name: 'Jane Smith'
-        }
-      }
-    },
-    {
-      id: 3,
-      donor_id: 3,
-      project_id: 3,
-      amount: 50,
-      currency: 'XLM',
-      status: 'failed',
-      payment_method: 'stellar',
-      is_anonymous: false,
-      message: 'Small contribution to help out',
-      created_at: '2024-01-22T09:15:00Z',
-      updated_at: '2024-01-22T09:16:00Z',
-      donor: {
-        id: 3,
-        username: 'charlie_helper',
-        full_name: 'Charlie Brown',
-        email: 'charlie@example.com'
-      },
-      project: {
-        id: 3,
-        title: 'Community Garden App',
-        owner_id: 3,
-        owner: {
-          id: 3,
-          username: 'mike_wilson',
-          full_name: 'Mike Wilson'
-        }
-      }
+
+  const fetchDonations = async () => {
+    try {
+      setIsLoading(true);
+      const fetchedDonations = await donationsAPI.getDonations();
+      setDonations(fetchedDonations);
+    } catch (error) {
+      console.error('Failed to fetch donations:', error);
+      // Fallback to empty array on error
+      setDonations([]);
+    } finally {
+      setIsLoading(false);
     }
-  ];
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchDonations();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchDonations = async () => {
-      try {
-        // Mock API call - replace with actual implementation
-        setDonations(mockDonations);
-      } catch (error) {
-        console.error('Failed to fetch donations:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchDonations();
   }, []);
 
@@ -221,7 +144,8 @@ const AdminDonations = () => {
   const handleDonationAction = async (donationId: number, action: string) => {
     setActionLoading(donationId);
     try {
-      // Mock API call - replace with actual implementation
+      // TODO: Implement actual API call for donation actions
+      // For now, we'll just update the local state
       console.log(`Performing ${action} on donation ${donationId}`);
       
       // Update local state
@@ -296,9 +220,14 @@ const AdminDonations = () => {
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
-            <Button variant="outline" size="sm">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleRefresh}
+              disabled={refreshing}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+              {refreshing ? 'Refreshing...' : 'Refresh'}
             </Button>
           </div>
         </div>

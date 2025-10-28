@@ -20,6 +20,11 @@ import UserManagement from "./pages/admin/UserManagement";
 import StudentVerifications from "./pages/admin/StudentVerifications";
 import AdminProjects from "./pages/admin/AdminProjects";
 import AdminDonations from "./pages/admin/AdminDonations";
+import AdminAnalytics from "./pages/admin/AdminAnalytics";
+import AdminActivityLogs from "./pages/admin/AdminActivityLogs";
+import AdminSystemSettings from "./pages/admin/AdminSystemSettings";
+import AdminCampaigns from "./pages/admin/AdminCampaigns";
+import CampaignDetail from "./pages/CampaignDetail";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -76,6 +81,14 @@ const AppContent = () => {
           } 
         />
         <Route 
+          path="/admin/campaigns" 
+          element={
+            <AdminRouteGuard>
+              <AdminCampaigns />
+            </AdminRouteGuard>
+          } 
+        />
+        <Route 
           path="/admin/donations" 
           element={
             <AdminRouteGuard>
@@ -87,7 +100,7 @@ const AppContent = () => {
           path="/admin/analytics" 
           element={
             <AdminRouteGuard>
-              <AdminDashboard />
+              <AdminAnalytics />
             </AdminRouteGuard>
           } 
         />
@@ -95,7 +108,7 @@ const AppContent = () => {
           path="/admin/logs" 
           element={
             <AdminRouteGuard>
-              <AdminDashboard />
+              <AdminActivityLogs />
             </AdminRouteGuard>
           } 
         />
@@ -103,7 +116,7 @@ const AppContent = () => {
           path="/admin/settings" 
           element={
             <AdminRouteGuard>
-              <AdminDashboard />
+              <AdminSystemSettings />
             </AdminRouteGuard>
           } 
         />
@@ -112,11 +125,12 @@ const AppContent = () => {
         <Route path="/" element={<AdminRedirect><Landing /></AdminRedirect>} />
         <Route path="/projects" element={<AdminRedirect><Projects /></AdminRedirect>} />
         <Route path="/campaigns" element={<AdminRedirect><Campaigns /></AdminRedirect>} />
+        <Route path="/campaigns/:id" element={<AdminRedirect><CampaignDetail /></AdminRedirect>} />
         <Route 
           path="/donor/dashboard" 
           element={
             <AdminRedirect>
-              <AuthGuard requiredRole="base_user">
+              <AuthGuard requiredRole="BASE_USER">
                 <DonorDashboard />
               </AuthGuard>
             </AdminRedirect>
@@ -136,7 +150,7 @@ const AppContent = () => {
           path="/student/dashboard" 
           element={
             <AdminRedirect>
-              <AuthGuard requiredRole="student">
+              <AuthGuard requiredRole="STUDENT">
                 <StudentDashboard />
               </AuthGuard>
             </AdminRedirect>

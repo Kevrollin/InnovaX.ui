@@ -20,108 +20,262 @@ import {
   Mail,
   Phone,
   Calendar,
-  Users
+  Users,
+  Edit,
+  Trash2,
+  Shield,
+  ShieldOff,
+  Eye
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { motion } from 'framer-motion';
-
-interface User {
-  id: number;
-  username: string;
-  email: string;
-  full_name?: string;
-  phone?: string;
-  role: string;
-  status: string;
-  created_at: string;
-  last_login?: string;
-}
+import { adminAPI, User, UsersResponse } from '@/services/admin';
+import UserDetailsModal from '@/components/admin/UserDetailsModal';
+import EditUserModal from '@/components/admin/EditUserModal';
 
 const UserManagement = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('all');
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    pages: 0
+  });
+  const [confirmationModal, setConfirmationModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    action: () => void;
+    user?: User;
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    action: () => {},
+  });
+  const [userDetailsModal, setUserDetailsModal] = useState<{
+    isOpen: boolean;
+    userId: number | null;
+  }>({
+    isOpen: false,
+    userId: null,
+  });
+  const [editUserModal, setEditUserModal] = useState<{
+    isOpen: boolean;
+    user: User | null;
+  }>({
+    isOpen: false,
+    user: null,
+  });
+
+  const fetchUsers = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const params: any = {
+        page: pagination.page,
+        limit: pagination.limit
+      };
+      
+      if (filterRole !== 'all') {
+        params.role = filterRole.toUpperCase();
+      }
+      
+      const response: UsersResponse = await adminAPI.getUsers(params);
+      setUsers(response.users);
+      setPagination(response.pagination);
+    } catch (error) {
+      console.error('Failed to fetch users:', error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch users');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        // Mock data for now - replace with actual API call
-        const mockUsers: User[] = [
-          {
-            id: 1,
-            username: 'john_doe',
-            email: 'john@example.com',
-            full_name: 'John Doe',
-            phone: '+1234567890',
-            role: 'base_user',
-            status: 'active',
-            created_at: '2024-01-15T10:30:00Z',
-            last_login: '2024-01-20T14:22:00Z'
-          },
-          {
-            id: 2,
-            username: 'jane_student',
-            email: 'jane@university.edu',
-            full_name: 'Jane Smith',
-            phone: '+1234567891',
-            role: 'student',
-            status: 'active',
-            created_at: '2024-01-10T09:15:00Z',
-            last_login: '2024-01-19T16:45:00Z'
-          },
-          {
-            id: 3,
-            username: 'admin',
-            email: 'admin@fundhub.com',
-            full_name: 'FundHub Administrator',
-            phone: '+1234567890',
-            role: 'admin',
-            status: 'active',
-            created_at: '2024-01-01T00:00:00Z',
-            last_login: '2024-01-20T18:30:00Z'
-          }
-        ];
-        setUsers(mockUsers);
-      } catch (error) {
-        console.error('Failed to fetch users:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchUsers();
-  }, []);
+  }, [pagination.page, filterRole]);
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (user.full_name && user.full_name.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesRole = filterRole === 'all' || user.role === filterRole;
-    return matchesSearch && matchesRole;
+                         (user.fullName && user.fullName.toLowerCase().includes(searchTerm.toLowerCase()));
+    return matchesSearch;
   });
 
   const getRoleBadgeVariant = (role: string) => {
     switch (role) {
-      case 'admin': return 'destructive';
-      case 'student': return 'default';
-      case 'base_user': return 'secondary';
+      case 'ADMIN': return 'destructive';
+      case 'STUDENT': return 'default';
+      case 'BASE_USER': return 'secondary';
+      case 'GUEST': return 'outline';
+      case 'INSTITUTION': return 'secondary';
+      case 'SPONSOR': return 'default';
       default: return 'outline';
     }
   };
 
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
-      case 'active': return 'default';
-      case 'inactive': return 'secondary';
-      case 'suspended': return 'destructive';
+      case 'ACTIVE': return 'default';
+      case 'INACTIVE': return 'secondary';
+      case 'SUSPENDED': return 'destructive';
+      case 'PENDING': return 'outline';
       default: return 'outline';
     }
+  };
+
+  // User action functions
+  const handleViewUser = (user: User) => {
+    setUserDetailsModal({
+      isOpen: true,
+      userId: user.id,
+    });
+  };
+
+  const handleEditUser = (user: User) => {
+    setEditUserModal({
+      isOpen: true,
+      user: user,
+    });
+  };
+
+  const handleActivateUser = (user: User) => {
+    setConfirmationModal({
+      isOpen: true,
+      title: 'Activate User',
+      description: `Are you sure you want to activate ${user.fullName || user.username}? This will restore their access to the platform.`,
+      action: () => activateUser(user.id),
+      user,
+    });
+  };
+
+  const handleSuspendUser = (user: User) => {
+    setConfirmationModal({
+      isOpen: true,
+      title: 'Suspend User',
+      description: `Are you sure you want to suspend ${user.fullName || user.username}? This will prevent them from accessing the platform.`,
+      action: () => suspendUser(user.id),
+      user,
+    });
+  };
+
+  const handleDeleteUser = (user: User) => {
+    setConfirmationModal({
+      isOpen: true,
+      title: 'Delete User',
+      description: `Are you sure you want to permanently delete ${user.fullName || user.username}? This action cannot be undone and will remove all their data from the platform.`,
+      action: () => deleteUser(user.id),
+      user,
+    });
+  };
+
+  const activateUser = async (userId: number) => {
+    try {
+      await adminAPI.updateUserStatus(userId, 'ACTIVE');
+      await fetchUsers();
+    } catch (error) {
+      console.error('Failed to activate user:', error);
+      setError(error instanceof Error ? error.message : 'Failed to activate user');
+    }
+  };
+
+  const suspendUser = async (userId: number) => {
+    try {
+      await adminAPI.updateUserStatus(userId, 'SUSPENDED');
+      await fetchUsers();
+    } catch (error) {
+      console.error('Failed to suspend user:', error);
+      setError(error instanceof Error ? error.message : 'Failed to suspend user');
+    }
+  };
+
+  const deleteUser = async (userId: number) => {
+    try {
+      await adminAPI.deleteUser(userId);
+      await fetchUsers();
+    } catch (error) {
+      console.error('Failed to delete user:', error);
+      setError(error instanceof Error ? error.message : 'Failed to delete user');
+    }
+  };
+
+  const closeConfirmationModal = () => {
+    setConfirmationModal({
+      isOpen: false,
+      title: '',
+      description: '',
+      action: () => {},
+    });
+  };
+
+  const closeUserDetailsModal = () => {
+    setUserDetailsModal({
+      isOpen: false,
+      userId: null,
+    });
+  };
+
+  const closeEditUserModal = () => {
+    setEditUserModal({
+      isOpen: false,
+      user: null,
+    });
+  };
+
+  const handleUserSave = async (updatedUser: User) => {
+    // Update the user in the local state
+    setUsers(prevUsers => 
+      prevUsers.map(user => 
+        user.id === updatedUser.id ? updatedUser : user
+      )
+    );
+    
+    // Close the edit modal
+    closeEditUserModal();
+    
+    // Optionally refresh the entire list to ensure consistency
+    await fetchUsers();
   };
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <p className="text-red-500 mb-4">Error: {error}</p>
+          <Button onClick={() => window.location.reload()}>
+            Retry
+          </Button>
+        </div>
       </div>
     );
   }
@@ -142,7 +296,7 @@ const UserManagement = () => {
           <div className="flex items-center space-x-2">
             <Badge variant="secondary" className="text-xs">
               <Users className="h-3 w-3 mr-1" />
-              {users.length} Total Users
+              {pagination.total} Total Users
             </Badge>
           </div>
         </div>
@@ -181,23 +335,23 @@ const UserManagement = () => {
                   All
                 </Button>
                 <Button
-                  variant={filterRole === 'admin' ? 'default' : 'outline'}
-                  onClick={() => setFilterRole('admin')}
-                  className={filterRole === 'admin' ? 'bg-primary text-primary-foreground' : ''}
+                  variant={filterRole === 'ADMIN' ? 'default' : 'outline'}
+                  onClick={() => setFilterRole('ADMIN')}
+                  className={filterRole === 'ADMIN' ? 'bg-primary text-primary-foreground' : ''}
                 >
                   Admins
                 </Button>
                 <Button
-                  variant={filterRole === 'student' ? 'default' : 'outline'}
-                  onClick={() => setFilterRole('student')}
-                  className={filterRole === 'student' ? 'bg-primary text-primary-foreground' : ''}
+                  variant={filterRole === 'STUDENT' ? 'default' : 'outline'}
+                  onClick={() => setFilterRole('STUDENT')}
+                  className={filterRole === 'STUDENT' ? 'bg-primary text-primary-foreground' : ''}
                 >
                   Students
                 </Button>
                 <Button
-                  variant={filterRole === 'base_user' ? 'default' : 'outline'}
-                  onClick={() => setFilterRole('base_user')}
-                  className={filterRole === 'base_user' ? 'bg-primary text-primary-foreground' : ''}
+                  variant={filterRole === 'BASE_USER' ? 'default' : 'outline'}
+                  onClick={() => setFilterRole('BASE_USER')}
+                  className={filterRole === 'BASE_USER' ? 'bg-primary text-primary-foreground' : ''}
                 >
                   Users
                 </Button>
@@ -241,11 +395,11 @@ const UserManagement = () => {
                         <div className="flex items-center space-x-3">
                           <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
                             <span className="text-sm font-medium text-primary-foreground">
-                              {user.full_name?.charAt(0) || user.username.charAt(0)}
+                              {user.fullName?.charAt(0) || user.username.charAt(0)}
                             </span>
                           </div>
                           <div>
-                            <div className="font-medium text-foreground">{user.full_name || user.username}</div>
+                            <div className="font-medium text-foreground">{user.fullName || user.username}</div>
                             <div className="text-sm text-muted-foreground">@{user.username}</div>
                           </div>
                         </div>
@@ -277,30 +431,62 @@ const UserManagement = () => {
                       <TableCell>
                         <div className="flex items-center text-sm">
                           <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
-                          <span className="text-foreground">{new Date(user.created_at).toLocaleDateString()}</span>
+                          <span className="text-foreground">{new Date(user.createdAt).toLocaleDateString()}</span>
                         </div>
                       </TableCell>
                       <TableCell>
-                        {user.last_login ? (
+                        {user.lastLogin ? (
                           <div className="text-sm text-foreground">
-                            {new Date(user.last_login).toLocaleDateString()}
+                            {new Date(user.lastLogin).toLocaleDateString()}
                           </div>
                         ) : (
                           <span className="text-sm text-muted-foreground">Never</span>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end space-x-2">
-                          <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
-                            <UserCheck className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
-                            <UserX className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem onClick={() => handleViewUser(user)}>
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditUser(user)}>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit User
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            {user.status === 'ACTIVE' ? (
+                              <DropdownMenuItem 
+                                onClick={() => handleSuspendUser(user)}
+                                className="text-orange-600 focus:text-orange-600"
+                              >
+                                <ShieldOff className="h-4 w-4 mr-2" />
+                                Suspend User
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem 
+                                onClick={() => handleActivateUser(user)}
+                                className="text-green-600 focus:text-green-600"
+                              >
+                                <Shield className="h-4 w-4 mr-2" />
+                                Activate User
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              onClick={() => handleDeleteUser(user)}
+                              className="text-red-600 focus:text-red-600"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete User
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -310,6 +496,48 @@ const UserManagement = () => {
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* Confirmation Modal */}
+      <AlertDialog open={confirmationModal.isOpen} onOpenChange={closeConfirmationModal}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmationModal.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmationModal.description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={closeConfirmationModal}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => {
+                confirmationModal.action();
+                closeConfirmationModal();
+              }}
+              className={confirmationModal.title.includes('Delete') ? 'bg-red-600 hover:bg-red-700' : ''}
+            >
+              {confirmationModal.title.includes('Delete') ? 'Delete' : 'Continue'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* User Details Modal */}
+      <UserDetailsModal
+        isOpen={userDetailsModal.isOpen}
+        onClose={closeUserDetailsModal}
+        userId={userDetailsModal.userId}
+        onEdit={handleEditUser}
+      />
+
+      {/* Edit User Modal */}
+      <EditUserModal
+        isOpen={editUserModal.isOpen}
+        onClose={closeEditUserModal}
+        user={editUserModal.user}
+        onSave={handleUserSave}
+      />
     </div>
   );
 };

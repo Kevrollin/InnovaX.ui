@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Navbar } from '@/components/layout/Navbar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,10 +23,15 @@ import {
   FileText,
   Save,
   Eye,
-  ArrowLeft
+  ArrowLeft,
+  Lock,
+  CheckCircle,
+  Clock,
+  XCircle
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuthStore } from '@/store/authStore';
+import { useAuth } from '@/hooks/useAuth';
 import { projectsAPI } from '@/services/projects';
 import { toast } from 'sonner';
 import { Project, Milestone } from '@/types';
@@ -34,9 +39,38 @@ import { Project, Milestone } from '@/types';
 const CreateProject = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const { isVerifiedStudent, isPendingVerification, isVerificationRejected, refreshUserProfile } = useAuth();
   const [activeTab, setActiveTab] = useState('basic');
   const [isLoading, setIsLoading] = useState(false);
   const [isPreview, setIsPreview] = useState(false);
+  const [isCheckingVerification, setIsCheckingVerification] = useState(true);
+
+  useEffect(() => {
+    const checkVerificationStatus = async () => {
+      try {
+        // Only refresh if we don't have user data or student profile
+        if (!user || !user.studentProfile) {
+          await refreshUserProfile();
+        }
+        
+        if (!isVerifiedStudent()) {
+          toast.error('You need to be verified as a student to create projects');
+          navigate('/student/dashboard');
+        }
+      } catch (error) {
+        console.error('Failed to check verification status:', error);
+        // Don't show error for rate limiting
+        if (!error.message.includes('429')) {
+          toast.error('Failed to verify your status');
+        }
+        navigate('/student/dashboard');
+      } finally {
+        setIsCheckingVerification(false);
+      }
+    };
+
+    checkVerificationStatus();
+  }, [isVerifiedStudent, refreshUserProfile, navigate, user]);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -197,6 +231,68 @@ const CreateProject = () => {
       full_name: user?.full_name
     }
   };
+
+  // Show loading while checking verification
+  if (isCheckingVerification) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Checking verification status...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show verification required message if not verified
+  if (!isVerifiedStudent()) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <main className="flex-1 bg-gradient-to-b from-background to-card">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <Card className="max-w-2xl mx-auto border-red-500/20 bg-red-500/5">
+              <CardContent className="pt-6">
+                <div className="text-center">
+                  <div className="flex justify-center mb-4">
+                    {isPendingVerification() ? (
+                      <Clock className="h-16 w-16 text-yellow-500" />
+                    ) : isVerificationRejected() ? (
+                      <XCircle className="h-16 w-16 text-red-500" />
+                    ) : (
+                      <Lock className="h-16 w-16 text-gray-500" />
+                    )}
+                  </div>
+                  <h2 className="text-2xl font-bold mb-4">
+                    {isPendingVerification() ? 'Verification Pending' : 
+                     isVerificationRejected() ? 'Verification Required' : 
+                     'Access Restricted'}
+                  </h2>
+                  <p className="text-muted-foreground mb-6">
+                    {isPendingVerification() ? 
+                      'Your student profile is under review. You\'ll be able to create projects once verified.' :
+                     isVerificationRejected() ?
+                      'Your student verification was rejected. Please contact support or update your profile.' :
+                      'You need to be verified as a student to create projects.'}
+                  </p>
+                  <div className="flex gap-4 justify-center">
+                    <Button variant="outline" onClick={() => navigate('/student/dashboard')}>
+                      Back to Dashboard
+                    </Button>
+                    {isVerificationRejected() && (
+                      <Button onClick={() => navigate('/student/profile')}>
+                        Update Profile
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col">

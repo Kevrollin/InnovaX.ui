@@ -26,7 +26,7 @@ export interface StudentProfile {
   admissionNumber: string;
   idNumber?: string;
   estimatedGraduationYear?: number;
-  verificationStatus: 'pending' | 'verified' | 'rejected';
+  verificationStatus: 'PENDING' | 'APPROVED' | 'REJECTED';
   verificationMessage?: string;
   verifiedAt?: string;
   createdAt: string;
@@ -160,5 +160,117 @@ export interface Campaign {
     name: string;
     email: string;
     website: string;
+  };
+}
+
+// Updated Campaign interface with submission fields
+export interface CampaignWithSubmissions extends Campaign {
+  title: string;
+  campaignType: 'custom' | 'mini';
+  heroImageUrl: string;
+  fundingTrail: boolean;
+  likesCount: number;
+  rewardPool?: number;
+  prizeFirstPosition?: {
+    prize: string;
+    gifts: string;
+  };
+  prizeSecondPosition?: {
+    prize: string;
+    gifts: string;
+  };
+  prizeThirdPosition?: {
+    prize: string;
+    gifts: string;
+  };
+  prizePool?: number;
+  prizesBreakdown?: {
+    first: string;
+    second: string;
+    third: string;
+  };
+  submissionStartDate?: string;
+  submissionEndDate?: string;
+  resultsAnnouncementDate?: string;
+  awardDistributionDate?: string;
+  registrationStartDate?: string;
+  registrationEndDate?: string;
+  creator?: {
+    id: number;
+    username: string;
+    fullName?: string;
+    email: string;
+  };
+}
+
+// Campaign Participation Types
+export type ParticipationStatus = 'pending' | 'approved' | 'rejected';
+export type SubmissionStatus = 'not_submitted' | 'submitted' | 'under_review' | 'graded' | 'winner' | 'runner_up' | 'not_selected';
+
+export interface CampaignParticipation {
+  id: number;
+  campaignId: number;
+  userId: number;
+  motivation: string;
+  experience: string;
+  portfolio?: string;
+  additionalInfo?: string;
+  status: ParticipationStatus;
+  submissionStatus: SubmissionStatus;
+  submittedAt: string;
+  reviewedAt?: string;
+  reviewedBy?: number;
+  reviewNotes?: string;
+  createdAt: string;
+  updatedAt?: string;
+  participant?: {
+    id: number;
+    username: string;
+    fullName?: string;
+    email: string;
+  };
+  submission?: CampaignSubmission;
+}
+
+// Campaign Submission Types
+export interface CampaignSubmission {
+  id: number;
+  campaignId: number;
+  userId: number;
+  participationId: number;
+  projectTitle: string;
+  projectDescription: string;
+  projectScreenshots: string[];
+  projectLinks: {
+    demoUrl?: string;
+    githubUrl?: string;
+    filesUrl?: string;
+  };
+  pitchDeckUrl?: string;
+  status: SubmissionStatus;
+  submissionDate: string;
+  score?: number;
+  grade?: string;
+  feedback?: string;
+  gradedBy?: number;
+  gradedAt?: string;
+  position?: number;
+  prizeAmount?: number;
+  prizeDistributed: boolean;
+  prizeDistributedAt?: string;
+  createdAt: string;
+  updatedAt?: string;
+  submitter?: {
+    id: number;
+    username: string;
+    fullName?: string;
+    email: string;
+  };
+  campaign?: CampaignWithSubmissions;
+  participation?: CampaignParticipation;
+  grader?: {
+    id: number;
+    username: string;
+    fullName?: string;
   };
 }

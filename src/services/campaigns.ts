@@ -1,118 +1,248 @@
-import { Campaign } from '@/types';
+import { apiService } from './api';
 
-export interface CampaignFilters {
-  search?: string;
-  status?: string;
+export interface Campaign {
+  id: number;
+  title: string;
+  description: string;
+  tags: string[];
+  campaignType: 'custom' | 'mini';
+  createdBy: number;
+  startDate: string;
+  endDate: string;
+  heroImageUrl: string;
+  fundingTrail: boolean;
+  status: 'draft' | 'active' | 'completed' | 'cancelled';
+  likesCount: number;
+  
+  // Submission-related fields
+  submissionStartDate?: string;
+  submissionEndDate?: string;
+  resultsAnnouncementDate?: string;
+  awardDistributionDate?: string;
+  
+  // Custom Campaign Fields
+  rewardPool?: number;
+  prizeFirstPosition?: {
+    prize: string;
+    gifts: string;
+  };
+  prizeSecondPosition?: {
+    prize: string;
+    gifts: string;
+  };
+  prizeThirdPosition?: {
+    prize: string;
+    gifts: string;
+  };
+  
+  // Mini Campaign Fields
+  prizePool?: number;
+  prizesBreakdown?: {
+    first: string;
+    second: string;
+    third: string;
+  };
+  
+  createdAt: string;
+  updatedAt: string;
+  creator?: {
+    id: number;
+    username: string;
+    fullName?: string;
+    email: string;
+  };
 }
 
-// Mock campaigns data
-const mockCampaigns: Campaign[] = [
-  {
-    id: 1,
-    name: 'Tech Innovation Challenge',
-    description: 'A competition to find the most innovative tech solutions for social good.',
-    short_description: 'Innovation competition for social good',
-    status: 'active',
-    start_date: '2024-02-01T00:00:00Z',
-    end_date: '2024-06-30T23:59:59Z',
-    funding_goal: 100000,
-    total_funding: 45000,
-    currency: 'USD',
-    created_by: 1,
-    created_at: '2024-01-15T10:00:00Z',
-    updated_at: '2024-01-20T15:30:00Z',
-    tags: ['technology', 'innovation', 'social-good'],
-    image_url: '/placeholder.svg',
-    organizer: {
-      id: 1,
-      name: 'Tech for Good Foundation',
-      email: 'contact@techforgood.org',
-      website: 'https://techforgood.org'
-    }
-  },
-  {
-    id: 2,
-    name: 'Environmental Sustainability Drive',
-    description: 'Supporting projects that promote environmental sustainability and green technology.',
-    short_description: 'Green technology and sustainability',
-    status: 'active',
-    start_date: '2024-01-01T00:00:00Z',
-    end_date: '2024-12-31T23:59:59Z',
-    funding_goal: 200000,
-    total_funding: 125000,
-    currency: 'USD',
-    created_by: 2,
-    created_at: '2024-01-01T08:00:00Z',
-    updated_at: '2024-01-25T12:15:00Z',
-    tags: ['environment', 'sustainability', 'green-tech'],
-    image_url: '/placeholder.svg',
-    organizer: {
-      id: 2,
-      name: 'Green Future Initiative',
-      email: 'info@greenfuture.org',
-      website: 'https://greenfuture.org'
-    }
-  },
-  {
-    id: 3,
-    name: 'Student Entrepreneurship Program',
-    description: 'Empowering student entrepreneurs with funding and mentorship opportunities.',
-    short_description: 'Student startup funding program',
-    status: 'completed',
-    start_date: '2023-09-01T00:00:00Z',
-    end_date: '2023-12-31T23:59:59Z',
-    funding_goal: 50000,
-    total_funding: 50000,
-    currency: 'USD',
-    created_by: 3,
-    created_at: '2023-08-15T09:00:00Z',
-    updated_at: '2023-12-31T18:00:00Z',
-    tags: ['education', 'entrepreneurship', 'students'],
-    image_url: '/placeholder.svg',
-    organizer: {
-      id: 3,
-      name: 'University Innovation Hub',
-      email: 'innovation@university.edu',
-      website: 'https://university.edu/innovation'
-    }
-  }
-];
+export interface CreateCampaignRequest {
+  title: string;
+  description: string;
+  tags: string[];
+  campaignType: 'custom' | 'mini';
+  startDate: string;
+  endDate: string;
+  heroImageUrl: string;
+  fundingTrail?: boolean;
+  
+  // Submission-related fields
+  submissionStartDate?: string;
+  submissionEndDate?: string;
+  resultsAnnouncementDate?: string;
+  awardDistributionDate?: string;
+  
+  // Custom Campaign Fields
+  rewardPool?: number;
+  prizeFirstPosition?: {
+    prize: string;
+    gifts: string;
+  };
+  prizeSecondPosition?: {
+    prize: string;
+    gifts: string;
+  };
+  prizeThirdPosition?: {
+    prize: string;
+    gifts: string;
+  };
+  
+  // Mini Campaign Fields
+  prizePool?: number;
+  prizesBreakdown?: {
+    first: string;
+    second: string;
+    third: string;
+  };
+}
+
+export interface UpdateCampaignRequest {
+  title?: string;
+  description?: string;
+  tags?: string[];
+  campaignType?: 'custom' | 'mini';
+  startDate?: string;
+  endDate?: string;
+  heroImageUrl?: string;
+  fundingTrail?: boolean;
+  status?: 'draft' | 'active' | 'completed' | 'cancelled';
+  
+  // Submission-related fields
+  submissionStartDate?: string;
+  submissionEndDate?: string;
+  resultsAnnouncementDate?: string;
+  awardDistributionDate?: string;
+  
+  // Custom Campaign Fields
+  rewardPool?: number;
+  prizeFirstPosition?: {
+    prize: string;
+    gifts: string;
+  };
+  prizeSecondPosition?: {
+    prize: string;
+    gifts: string;
+  };
+  prizeThirdPosition?: {
+    prize: string;
+    gifts: string;
+  };
+  
+  // Mini Campaign Fields
+  prizePool?: number;
+  prizesBreakdown?: {
+    first: string;
+    second: string;
+    third: string;
+  };
+}
 
 export const campaignsAPI = {
-  async getCampaigns(filters?: CampaignFilters): Promise<Campaign[]> {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    let filteredCampaigns = [...mockCampaigns];
-    
-    // Apply filters
-    if (filters?.search) {
-      const searchLower = filters.search.toLowerCase();
-      filteredCampaigns = filteredCampaigns.filter(campaign => 
-        campaign.title.toLowerCase().includes(searchLower) ||
-        campaign.description.toLowerCase().includes(searchLower) ||
-        campaign.tags.some(tag => tag.toLowerCase().includes(searchLower))
-      );
+  async getCampaigns(params?: {
+    search?: string;
+    status?: string;
+  }): Promise<Campaign[]> {
+    try {
+      const queryParams = new URLSearchParams();
+      if (params?.search) queryParams.append('search', params.search);
+      if (params?.status) queryParams.append('status', params.status);
+
+      const queryString = queryParams.toString();
+      const endpoint = queryString ? `/api/campaigns?${queryString}` : '/api/campaigns';
+      
+      const response = await apiService.request(endpoint);
+      return response.data as Campaign[];
+    } catch (error) {
+      console.error('Failed to fetch campaigns:', error);
+      throw error;
     }
-    
-    if (filters?.status) {
-      filteredCampaigns = filteredCampaigns.filter(campaign => 
-        campaign.status === filters.status
-      );
-    }
-    
-    return filteredCampaigns;
   },
 
   async getCampaign(id: string): Promise<Campaign> {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const campaign = mockCampaigns.find(c => c.id === parseInt(id));
-    if (!campaign) {
-      throw new Error('Campaign not found');
+    try {
+      const response = await apiService.request(`/api/campaigns/${id}`);
+      return response.data as Campaign;
+    } catch (error) {
+      console.error('Failed to fetch campaign:', error);
+      throw error;
     }
-    
-    return campaign;
+  },
+
+  async createCampaign(campaignData: CreateCampaignRequest): Promise<Campaign> {
+    try {
+      const response = await apiService.request('/api/campaigns', {
+        method: 'POST',
+        body: JSON.stringify(campaignData),
+      });
+      return response.data as Campaign;
+    } catch (error) {
+      console.error('Failed to create campaign:', error);
+      throw error;
+    }
+  },
+
+  async updateCampaign(id: string, campaignData: UpdateCampaignRequest): Promise<Campaign> {
+    try {
+      const response = await apiService.request(`/api/campaigns/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(campaignData),
+      });
+      return response.data as Campaign;
+    } catch (error) {
+      console.error('Failed to update campaign:', error);
+      throw error;
+    }
+  },
+
+  async deleteCampaign(id: string): Promise<void> {
+    try {
+      await apiService.request(`/api/campaigns/${id}`, {
+        method: 'DELETE',
+      });
+    } catch (error) {
+      console.error('Failed to delete campaign:', error);
+      throw error;
+    }
+  },
+
+  async participateInCampaign(data: {
+    campaignId: number;
+    motivation: string;
+    experience: string;
+    portfolio?: string;
+    additionalInfo?: string;
+  }): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await apiService.request('/api/campaigns/participate', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+      return response;
+    } catch (error) {
+      console.error('Failed to participate in campaign:', error);
+      throw error;
+    }
+  },
+
+  // Like functionality
+  async toggleLike(campaignId: number): Promise<{ liked: boolean; likesCount: number }> {
+    try {
+      const response = await apiService.request(`/api/campaigns/${campaignId}/like`, {
+        method: 'POST',
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Failed to toggle like:', error);
+      throw error;
+    }
+  },
+
+  async getLikeStatus(campaignId: number): Promise<{ liked: boolean; likesCount: number }> {
+    try {
+      const response = await apiService.request(`/api/campaigns/${campaignId}/like-status`, {
+        method: 'GET',
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Failed to get like status:', error);
+      throw error;
+    }
   },
 };

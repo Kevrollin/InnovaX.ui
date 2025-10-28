@@ -32,139 +32,64 @@ import {
   Mail,
   Phone,
   Calendar,
+  RotateCcw,
+  Ban,
   MapPin,
   GraduationCap,
   Shield,
   Flag,
-  Ban,
   MoreHorizontal,
   Download,
   RefreshCw
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { adminAPI } from '@/services/admin';
+import { adminAPI, StudentVerification } from '@/services/admin';
 import StudentDetailsModal from '@/components/admin/StudentDetailsModal';
 
-interface StudentVerification {
-  id: number;
-  user_id: number;
-  username: string;
-  email: string;
-  full_name: string;
-  phone?: string;
-  school_email: string;
-  school_name: string;
-  admission_number: string;
-  id_number?: string;
-  verification_status: 'pending' | 'approved' | 'rejected';
-  verification_message?: string;
-  verified_by?: number;
-  verified_at?: string;
-  created_at: string;
-  updated_at: string;
-  estimated_graduation_year?: number;
-  documents?: string[];
-}
-
 const StudentVerifications = () => {
-  const [activeTab, setActiveTab] = useState('pending');
+  const [activeTab, setActiveTab] = useState('PENDING');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<StudentVerification | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [students, setStudents] = useState<StudentVerification[]>([]);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock data - replace with actual API calls
-  const mockStudents: StudentVerification[] = [
-    {
-      id: 1,
-      user_id: 1,
-      username: 'john_student',
-      email: 'john@example.com',
-      full_name: 'John Doe',
-      phone: '+1234567890',
-      school_email: 'john.doe@university.edu',
-      school_name: 'University of Technology',
-      admission_number: '2023/001',
-      id_number: '12345678',
-      verification_status: 'pending',
-      created_at: '2024-01-15T10:30:00Z',
-      updated_at: '2024-01-15T10:30:00Z',
-      estimated_graduation_year: 2027,
-      documents: ['id_copy.pdf', 'admission_letter.pdf']
-    },
-    {
-      id: 2,
-      user_id: 2,
-      username: 'jane_smith',
-      email: 'jane@example.com',
-      full_name: 'Jane Smith',
-      phone: '+1234567891',
-      school_email: 'jane.smith@college.edu',
-      school_name: 'State College',
-      admission_number: '2023/002',
-      id_number: '87654321',
-      verification_status: 'approved',
-      verification_message: 'All documents verified successfully',
-      verified_by: 1,
-      verified_at: '2024-01-16T14:22:00Z',
-      created_at: '2024-01-10T09:15:00Z',
-      updated_at: '2024-01-16T14:22:00Z',
-      estimated_graduation_year: 2026
-    },
-    {
-      id: 3,
-      user_id: 3,
-      username: 'mike_wilson',
-      email: 'mike@example.com',
-      full_name: 'Mike Wilson',
-      phone: '+1234567892',
-      school_email: 'mike.wilson@institute.edu',
-      school_name: 'Technical Institute',
-      admission_number: '2023/003',
-      id_number: '11223344',
-      verification_status: 'rejected',
-      verification_message: 'Invalid admission number provided',
-      verified_by: 1,
-      verified_at: '2024-01-17T16:45:00Z',
-      created_at: '2024-01-12T11:20:00Z',
-      updated_at: '2024-01-17T16:45:00Z',
-      estimated_graduation_year: 2025
+  const fetchStudents = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await adminAPI.getAllStudentVerifications();
+      setStudents(response);
+    } catch (error) {
+      console.error('Failed to fetch students:', error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch students');
+    } finally {
+      setIsLoading(false);
     }
-  ];
+  };
 
   useEffect(() => {
-    const fetchStudents = async () => {
-      try {
-        // Mock API call - replace with actual implementation
-        setStudents(mockStudents);
-      } catch (error) {
-        console.error('Failed to fetch students:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchStudents();
   }, []);
 
   const filteredStudents = students.filter(student => {
-    const matchesTab = student.verification_status === activeTab;
-    const matchesSearch = student.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesTab = student.verificationStatus === activeTab;
+    const matchesSearch = student.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          student.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         student.school_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         student.admission_number.toLowerCase().includes(searchTerm.toLowerCase());
+                         student.schoolName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         student.admissionNumber.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesTab && matchesSearch;
   });
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'approved':
-        return <Badge variant="default" className="bg-success text-white"><CheckCircle className="h-3 w-3 mr-1" />Approved</Badge>;
-      case 'rejected':
+      case 'APPROVED':
+        return <Badge variant="default" className="bg-green-600 text-white"><CheckCircle className="h-3 w-3 mr-1" />Approved</Badge>;
+      case 'REJECTED':
         return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>;
-      case 'pending':
+      case 'PENDING':
       default:
         return <Badge variant="secondary"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
     }
@@ -173,34 +98,102 @@ const StudentVerifications = () => {
   const handleStudentAction = async (studentId: number, action: string, message?: string) => {
     setActionLoading(studentId);
     try {
-      // Mock API call - replace with actual implementation
-      console.log(`Performing ${action} on student ${studentId}`, message);
+      if (action === 'approved') {
+        await adminAPI.approveVerification(studentId, message);
+      } else if (action === 'rejected') {
+        await adminAPI.rejectVerification(studentId, message);
+      }
       
-      // Update local state
-      setStudents(prev => prev.map(student => 
-        student.id === studentId 
-          ? { 
-              ...student, 
-              verification_status: action as any,
-              verification_message: message,
-              verified_at: new Date().toISOString()
-            }
-          : student
-      ));
-      
+      // Refresh the students list
+      await fetchStudents();
       setIsDetailsOpen(false);
     } catch (error) {
       console.error(`Failed to ${action} student:`, error);
+      setError(error instanceof Error ? error.message : `Failed to ${action} student`);
     } finally {
       setActionLoading(null);
     }
   };
 
+  const renderActionButtons = (student: StudentVerification) => {
+    const actions = [];
+    
+    // Always show view details button
+    actions.push(
+      <Button
+        key="view"
+        variant="ghost"
+        size="sm"
+        onClick={() => {
+          setSelectedStudent(student);
+          setIsDetailsOpen(true);
+        }}
+        className="text-muted-foreground hover:text-foreground"
+      >
+        <Eye className="h-4 w-4" />
+      </Button>
+    );
+
+    // Add status-specific actions
+    if (student.verificationStatus === 'PENDING') {
+      actions.push(
+        <Button
+          key="approve"
+          variant="ghost"
+          size="sm"
+          onClick={() => handleStudentAction(student.userId, 'approved')}
+          disabled={actionLoading === student.userId}
+          className="text-green-600 hover:text-green-700 hover:bg-green-50"
+        >
+          <CheckCircle className="h-4 w-4" />
+        </Button>,
+        <Button
+          key="reject"
+          variant="ghost"
+          size="sm"
+          onClick={() => handleStudentAction(student.userId, 'rejected')}
+          disabled={actionLoading === student.userId}
+          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+        >
+          <XCircle className="h-4 w-4" />
+        </Button>
+      );
+    } else if (student.verificationStatus === 'APPROVED') {
+      actions.push(
+        <Button
+          key="reject"
+          variant="ghost"
+          size="sm"
+          onClick={() => handleStudentAction(student.userId, 'rejected')}
+          disabled={actionLoading === student.userId}
+          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+        >
+          <Ban className="h-4 w-4" />
+        </Button>
+      );
+    } else if (student.verificationStatus === 'REJECTED') {
+      actions.push(
+        <Button
+          key="approve"
+          variant="ghost"
+          size="sm"
+          onClick={() => handleStudentAction(student.userId, 'approved')}
+          disabled={actionLoading === student.userId}
+          className="text-green-600 hover:text-green-700 hover:bg-green-50"
+        >
+          <RotateCcw className="h-4 w-4" />
+        </Button>
+      );
+    }
+
+    return actions;
+  };
+
   const getTabCounts = () => {
     return {
-      pending: students.filter(s => s.verification_status === 'pending').length,
-      approved: students.filter(s => s.verification_status === 'approved').length,
-      rejected: students.filter(s => s.verification_status === 'rejected').length,
+      PENDING: students.filter(s => s.verificationStatus === 'PENDING').length,
+      APPROVED: students.filter(s => s.verificationStatus === 'APPROVED').length,
+      REJECTED: students.filter(s => s.verificationStatus === 'REJECTED').length,
     };
   };
 
@@ -210,6 +203,19 @@ const StudentVerifications = () => {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <p className="text-red-500 mb-4">Error: {error}</p>
+          <Button onClick={fetchStudents}>
+            Retry
+          </Button>
+        </div>
       </div>
     );
   }
@@ -232,7 +238,7 @@ const StudentVerifications = () => {
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={fetchStudents}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
@@ -277,27 +283,27 @@ const StudentVerifications = () => {
       >
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="pending" className="flex items-center space-x-2">
+            <TabsTrigger value="PENDING" className="flex items-center space-x-2">
               <Clock className="h-4 w-4" />
               <span>Pending</span>
-              <Badge variant="secondary" className="ml-2">{counts.pending}</Badge>
+              <Badge variant="secondary" className="ml-2">{counts.PENDING}</Badge>
             </TabsTrigger>
-            <TabsTrigger value="approved" className="flex items-center space-x-2">
+            <TabsTrigger value="APPROVED" className="flex items-center space-x-2">
               <CheckCircle className="h-4 w-4" />
               <span>Approved</span>
-              <Badge variant="default" className="ml-2 bg-success">{counts.approved}</Badge>
+              <Badge variant="default" className="ml-2 bg-green-600">{counts.APPROVED}</Badge>
             </TabsTrigger>
-            <TabsTrigger value="rejected" className="flex items-center space-x-2">
+            <TabsTrigger value="REJECTED" className="flex items-center space-x-2">
               <XCircle className="h-4 w-4" />
               <span>Rejected</span>
-              <Badge variant="destructive" className="ml-2">{counts.rejected}</Badge>
+              <Badge variant="destructive" className="ml-2">{counts.REJECTED}</Badge>
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="pending" className="space-y-4">
+          <TabsContent value="PENDING" className="space-y-4">
             <Card className="border-border bg-card">
               <CardHeader>
-                <CardTitle className="text-foreground">Pending Verifications ({counts.pending})</CardTitle>
+                <CardTitle className="text-foreground">Pending Verifications ({counts.PENDING})</CardTitle>
                 <CardDescription>Students awaiting verification review</CardDescription>
               </CardHeader>
               <CardContent>
@@ -320,45 +326,35 @@ const StudentVerifications = () => {
                             <div className="flex items-center space-x-3">
                               <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
                                 <span className="text-sm font-medium text-primary-foreground">
-                                  {student.full_name.charAt(0)}
+                                  {student.fullName.charAt(0)}
                                 </span>
                               </div>
                               <div>
-                                <div className="font-medium text-foreground">{student.full_name}</div>
+                                <div className="font-medium text-foreground">{student.fullName}</div>
                                 <div className="text-sm text-muted-foreground">{student.email}</div>
                               </div>
                             </div>
                           </TableCell>
                           <TableCell>
                             <div>
-                              <div className="font-medium text-foreground">{student.school_name}</div>
-                              <div className="text-sm text-muted-foreground">{student.school_email}</div>
+                              <div className="font-medium text-foreground">{student.schoolName}</div>
+                              <div className="text-sm text-muted-foreground">{student.schoolEmail}</div>
                             </div>
                           </TableCell>
                           <TableCell>
-                            <span className="font-mono text-sm text-foreground">{student.admission_number}</span>
+                            <span className="font-mono text-sm text-foreground">{student.admissionNumber}</span>
                           </TableCell>
                           <TableCell>
                             <div className="text-sm text-foreground">
-                              {new Date(student.created_at).toLocaleDateString()}
+                              {new Date(student.createdAt).toLocaleDateString()}
                             </div>
                           </TableCell>
                           <TableCell>
-                            {getStatusBadge(student.verification_status)}
+                            {getStatusBadge(student.verificationStatus)}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end space-x-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedStudent(student);
-                                  setIsDetailsOpen(true);
-                                }}
-                                className="text-muted-foreground hover:text-foreground"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
+                              {renderActionButtons(student)}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -370,10 +366,10 @@ const StudentVerifications = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="approved" className="space-y-4">
+          <TabsContent value="APPROVED" className="space-y-4">
             <Card className="border-border bg-card">
               <CardHeader>
-                <CardTitle className="text-foreground">Approved Students ({counts.approved})</CardTitle>
+                <CardTitle className="text-foreground">Approved Students ({counts.APPROVED})</CardTitle>
                 <CardDescription>Successfully verified students</CardDescription>
               </CardHeader>
               <CardContent>
@@ -396,19 +392,19 @@ const StudentVerifications = () => {
                             <div className="flex items-center space-x-3">
                               <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
                                 <span className="text-sm font-medium text-primary-foreground">
-                                  {student.full_name.charAt(0)}
+                                  {(student.fullName || student.username || 'Unknown').charAt(0)}
                                 </span>
                               </div>
                               <div>
-                                <div className="font-medium text-foreground">{student.full_name}</div>
+                                <div className="font-medium text-foreground">{student.fullName || student.username || 'Unknown'}</div>
                                 <div className="text-sm text-muted-foreground">{student.email}</div>
                               </div>
                             </div>
                           </TableCell>
                           <TableCell>
                             <div>
-                              <div className="font-medium text-foreground">{student.school_name}</div>
-                              <div className="text-sm text-muted-foreground">{student.school_email}</div>
+                              <div className="font-medium text-foreground">{student.schoolName}</div>
+                              <div className="text-sm text-muted-foreground">{student.schoolEmail}</div>
                             </div>
                           </TableCell>
                           <TableCell>
@@ -416,25 +412,15 @@ const StudentVerifications = () => {
                           </TableCell>
                           <TableCell>
                             <div className="text-sm text-foreground">
-                              {student.verified_at ? new Date(student.verified_at).toLocaleDateString() : 'N/A'}
+                              {student.verifiedAt ? new Date(student.verifiedAt).toLocaleDateString() : 'N/A'}
                             </div>
                           </TableCell>
                           <TableCell>
-                            {getStatusBadge(student.verification_status)}
+                            {getStatusBadge(student.verificationStatus)}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end space-x-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedStudent(student);
-                                  setIsDetailsOpen(true);
-                                }}
-                                className="text-muted-foreground hover:text-foreground"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
+                              {renderActionButtons(student)}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -446,10 +432,10 @@ const StudentVerifications = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="rejected" className="space-y-4">
+          <TabsContent value="REJECTED" className="space-y-4">
             <Card className="border-border bg-card">
               <CardHeader>
-                <CardTitle className="text-foreground">Rejected Students ({counts.rejected})</CardTitle>
+                <CardTitle className="text-foreground">Rejected Students ({counts.REJECTED})</CardTitle>
                 <CardDescription>Students whose verification was rejected</CardDescription>
               </CardHeader>
               <CardContent>
@@ -472,47 +458,37 @@ const StudentVerifications = () => {
                             <div className="flex items-center space-x-3">
                               <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
                                 <span className="text-sm font-medium text-primary-foreground">
-                                  {student.full_name.charAt(0)}
+                                  {(student.fullName || student.username || 'Unknown').charAt(0)}
                                 </span>
                               </div>
                               <div>
-                                <div className="font-medium text-foreground">{student.full_name}</div>
+                                <div className="font-medium text-foreground">{student.fullName || student.username || 'Unknown'}</div>
                                 <div className="text-sm text-muted-foreground">{student.email}</div>
                               </div>
                             </div>
                           </TableCell>
                           <TableCell>
                             <div>
-                              <div className="font-medium text-foreground">{student.school_name}</div>
-                              <div className="text-sm text-muted-foreground">{student.school_email}</div>
+                              <div className="font-medium text-foreground">{student.schoolName}</div>
+                              <div className="text-sm text-muted-foreground">{student.schoolEmail}</div>
                             </div>
                           </TableCell>
                           <TableCell>
                             <div className="text-sm text-foreground max-w-xs truncate">
-                              {student.verification_message || 'No reason provided'}
+                              {student.verificationReason || 'No reason provided'}
                             </div>
                           </TableCell>
                           <TableCell>
                             <div className="text-sm text-foreground">
-                              {student.verified_at ? new Date(student.verified_at).toLocaleDateString() : 'N/A'}
+                              {student.verifiedAt ? new Date(student.verifiedAt).toLocaleDateString() : 'N/A'}
                             </div>
                           </TableCell>
                           <TableCell>
-                            {getStatusBadge(student.verification_status)}
+                            {getStatusBadge(student.verificationStatus)}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end space-x-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedStudent(student);
-                                  setIsDetailsOpen(true);
-                                }}
-                                className="text-muted-foreground hover:text-foreground"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
+                              {renderActionButtons(student)}
                             </div>
                           </TableCell>
                         </TableRow>

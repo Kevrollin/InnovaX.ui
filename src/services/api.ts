@@ -77,7 +77,7 @@ class ApiService {
 
       const data = await response.json();
       return {
-        data,
+        data: data.data || data, // Handle both wrapped and unwrapped responses
         status: response.status,
       };
     } catch (error) {
@@ -234,6 +234,10 @@ class ApiService {
     });
   }
 
+  async getDonation(id: string) {
+    return this.request(`/api/donations/${id}`);
+  }
+
   // Posts endpoints
   async getPosts(params?: {
     skip?: number;
@@ -308,6 +312,41 @@ class ApiService {
     return this.request('/api/admin/verifications');
   }
 
+  async getAllStudentVerifications() {
+    return this.request('/api/admin/verifications/all');
+  }
+
+  async getAllProjects(params?: {
+    search?: string;
+    status?: string;
+    category?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.category) queryParams.append('category', params.category);
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    
+    const queryString = queryParams.toString();
+    return this.request(`/api/admin/projects${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async updateProjectStatus(projectId: string, status: string) {
+    return this.request(`/api/admin/projects/${projectId}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    });
+  }
+
+  async deleteAdminProject(projectId: string) {
+    return this.request(`/api/admin/projects/${projectId}`, {
+      method: 'DELETE',
+    });
+  }
+
   async approveVerification(id: string) {
     return this.request(`/api/admin/verify-student`, {
       method: 'POST',
@@ -324,6 +363,56 @@ class ApiService {
 
   async getAnalytics() {
     return this.request('/api/admin/stats');
+  }
+
+  async getDashboardStats() {
+    return this.request('/api/admin/dashboard-stats');
+  }
+
+  async getUsers(params?: {
+    page?: number;
+    limit?: number;
+    role?: string;
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.role) queryParams.append('role', params.role);
+
+    const queryString = queryParams.toString();
+    const endpoint = queryString ? `/api/admin/users?${queryString}` : '/api/admin/users';
+    
+    return this.request(endpoint);
+  }
+
+  async updateUserStatus(userId: number, status: string) {
+    return this.request(`/api/admin/users/${userId}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    });
+  }
+
+  async deleteUser(userId: number) {
+    return this.request(`/api/admin/users/${userId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getUserById(userId: number) {
+    return this.request(`/api/admin/users/${userId}`);
+  }
+
+  async updateUser(userId: number, userData: {
+    fullName?: string;
+    email?: string;
+    phone?: string;
+    role?: string;
+    status?: string;
+  }) {
+    return this.request(`/api/admin/users/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(userData),
+    });
   }
 
   // Student endpoints
