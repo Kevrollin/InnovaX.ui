@@ -15,6 +15,8 @@ interface ApiError {
 class ApiService {
   private baseURL: string;
   private token: string | null = null;
+  // Request deduplication: track in-flight requests to prevent duplicate calls
+  private pendingRequests = new Map<string, Promise<ApiResponse<any>>>();
 
   constructor(baseURL: string) {
     this.baseURL = baseURL;
@@ -31,9 +33,43 @@ class ApiService {
     localStorage.removeItem('auth-token');
   }
 
+  // Generate a unique key for request deduplication
+  private getRequestKey(endpoint: string, options: RequestInit = {}): string {
+    const method = options.method || 'GET';
+    const body = options.body ? String(options.body) : '';
+    return `${method}:${endpoint}:${body}`;
+  }
+
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    retries = 2
+  ): Promise<ApiResponse<T>> {
+    const requestKey = this.getRequestKey(endpoint, options);
+    
+    // If the same request is already in flight, return the existing promise
+    if (this.pendingRequests.has(requestKey)) {
+      return this.pendingRequests.get(requestKey)! as Promise<ApiResponse<T>>;
+    }
+
+    // Create the request promise
+    const requestPromise = this.executeRequest<T>(endpoint, options, retries);
+    
+    // Store it in pending requests
+    this.pendingRequests.set(requestKey, requestPromise);
+    
+    // Remove from pending requests when done (success or failure)
+    requestPromise.finally(() => {
+      this.pendingRequests.delete(requestKey);
+    });
+
+    return requestPromise;
+  }
+
+  private async executeRequest<T>(
+    endpoint: string,
+    options: RequestInit = {},
+    retries = 2
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseURL}${endpoint}`;
     const headers: Record<string, string> = {
@@ -45,47 +81,70 @@ class ApiService {
       headers.Authorization = `Bearer ${this.token}`;
     }
 
-    try {
-      const response = await fetch(url, {
-        ...options,
-        headers,
-      });
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const response = await fetch(url, {
+          ...options,
+          headers,
+        });
 
-      if (!response.ok) {
-        let errorMessage = `API Error: ${response.status} ${response.statusText}`;
-        let errorDetails: any = null;
-        
-        try {
-          const errorData: ApiError = await response.json();
-          errorDetails = errorData;
+        // Handle rate limiting (429) with retry
+        if (response.status === 429 && attempt < retries) {
+          const retryAfter = response.headers.get('Retry-After');
+          // Use longer backoff for rate limits: 2s, 4s, 8s
+          const waitTime = retryAfter 
+            ? parseInt(retryAfter, 10) * 1000 
+            : Math.pow(2, attempt + 1) * 1000;
           
-          if (errorData.errors && errorData.errors.length > 0) {
-            errorMessage = errorData.errors.map(err => err.msg).join(', ');
-          } else if (errorData.message) {
-            errorMessage = errorData.message;
-          }
-        } catch {
-          // If we can't parse the error response, use the default message
+          console.warn(`Rate limited. Retrying after ${waitTime}ms... (attempt ${attempt + 1}/${retries + 1})`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          continue;
         }
-        
-        // Create a more detailed error object
-        const error = new Error(errorMessage);
-        (error as any).status = response.status;
-        (error as any).details = errorDetails;
-        throw error;
-      }
 
-      const data = await response.json();
-      return {
-        data: data.data || data, // Handle both wrapped and unwrapped responses
-        status: response.status,
-      };
-    } catch (error) {
-      if (error instanceof Error) {
-        throw error;
+        if (!response.ok) {
+          let errorMessage = `API Error: ${response.status} ${response.statusText}`;
+          let errorDetails: any = null;
+          
+          try {
+            const errorData: ApiError = await response.json();
+            errorDetails = errorData;
+            
+            if (errorData.errors && errorData.errors.length > 0) {
+              errorMessage = errorData.errors.map(err => err.msg).join(', ');
+            } else if (errorData.message) {
+              errorMessage = errorData.message;
+            }
+          } catch {
+            // If we can't parse the error response, use the default message
+          }
+          
+          // Create a more detailed error object
+          const error = new Error(errorMessage);
+          (error as any).status = response.status;
+          (error as any).details = errorDetails;
+          throw error;
+        }
+
+        const data = await response.json();
+        return {
+          data: data.data || data, // Handle both wrapped and unwrapped responses
+          status: response.status,
+        };
+      } catch (error: any) {
+        // If this is the last attempt or not a 429 error, throw
+        if (attempt === retries || (error.status !== undefined && error.status !== 429)) {
+          if (error instanceof Error) {
+            throw error;
+          }
+          throw new Error('Network error occurred');
+        }
+        // Otherwise, wait and retry
+        const waitTime = Math.pow(2, attempt + 1) * 1000;
+        await new Promise(resolve => setTimeout(resolve, waitTime));
       }
-      throw new Error('Network error occurred');
     }
+
+    throw new Error('Request failed after retries');
   }
 
   // Auth endpoints
@@ -195,10 +254,12 @@ class ApiService {
   async getCampaigns(params?: {
     search?: string;
     status?: string;
+    includeExpired?: boolean;
   }) {
     const queryParams = new URLSearchParams();
     if (params?.search) queryParams.append('search', params.search);
     if (params?.status) queryParams.append('status', params.status);
+    if (params?.includeExpired) queryParams.append('includeExpired', 'true');
 
     const queryString = queryParams.toString();
     const endpoint = queryString ? `/api/campaigns?${queryString}` : '/api/campaigns';
@@ -425,6 +486,108 @@ class ApiService {
       method: 'PUT',
       body: JSON.stringify(profileData),
     });
+  }
+
+  async getMyProjects(status?: string) {
+    const queryParams = new URLSearchParams();
+    if (status) queryParams.append('status', status);
+    
+    const queryString = queryParams.toString();
+    const endpoint = queryString ? `/api/students/my-projects?${queryString}` : '/api/students/my-projects';
+    
+    return this.request(endpoint);
+  }
+
+  async getProjectAnalytics(projectId: string) {
+    return this.request(`/api/projects/${projectId}/analytics`);
+  }
+
+  // Project engagement endpoints
+  async likeProject(projectId: string) {
+    return this.request(`/api/projects/${projectId}/like`, {
+      method: 'POST',
+    });
+  }
+
+  async getProjectLikeStatus(projectId: string) {
+    return this.request(`/api/projects/${projectId}/like-status`);
+  }
+
+  async trackProjectShare(projectId: string) {
+    return this.request(`/api/projects/${projectId}/share`, {
+      method: 'POST',
+    });
+  }
+
+  async trackProjectView(projectId: string) {
+    return this.request(`/api/projects/${projectId}/view`, {
+      method: 'POST',
+    });
+  }
+
+  // Upload endpoints
+  async uploadImage(file: File): Promise<ApiResponse<{ imageUrl: string; fileName: string }>> {
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const url = `${this.baseURL}/api/upload/image`;
+    const headers: Record<string, string> = {};
+    
+    if (this.token) {
+      headers.Authorization = `Bearer ${this.token}`;
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Upload failed' }));
+      throw new Error(error.message || 'Upload failed');
+    }
+
+    return response.json();
+  }
+
+  async uploadProjectImage(
+    file: File,
+    projectData: {
+      projectName: string;
+      description: string;
+      category: string;
+      studentId?: string;
+    }
+  ): Promise<ApiResponse<{ project: any; imageUrl: string }>> {
+    const formData = new FormData();
+    formData.append('image', file);
+    formData.append('projectName', projectData.projectName);
+    formData.append('description', projectData.description);
+    formData.append('category', projectData.category);
+    if (projectData.studentId) {
+      formData.append('studentId', projectData.studentId);
+    }
+
+    const url = `${this.baseURL}/api/upload/project-image`;
+    const headers: Record<string, string> = {};
+    
+    if (this.token) {
+      headers.Authorization = `Bearer ${this.token}`;
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Upload failed' }));
+      throw new Error(error.message || 'Upload failed');
+    }
+
+    return response.json();
   }
 }
 

@@ -39,6 +39,12 @@ export const MobileSidebar = ({ children }: MobileSidebarProps) => {
     return '/donor/dashboard';
   };
 
+  const getProfilePath = () => {
+    if (user?.role === 'ADMIN') return '/profile';
+    if (user?.role === 'STUDENT') return '/student/profile';
+    return '/profile';
+  };
+
   const handleLogout = () => {
     logout();
     navigate('/');
@@ -75,7 +81,7 @@ export const MobileSidebar = ({ children }: MobileSidebarProps) => {
     },
     {
       label: 'Profile',
-      href: '/profile',
+      href: getProfilePath(),
       icon: User,
     },
     {

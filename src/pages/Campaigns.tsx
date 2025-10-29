@@ -95,7 +95,13 @@ const Campaigns = () => {
                          campaign.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = status === 'all' || campaign.status === status;
     const matchesTab = activeTab === 'all' || campaign.status === activeTab;
-    return matchesSearch && matchesStatus && matchesTab;
+    
+    // Additional client-side filtering for expired campaigns
+    const isExpired = new Date(campaign.endDate) < new Date();
+    const matchesExpiredFilter = activeTab !== 'expired' || isExpired;
+    const excludesExpired = activeTab !== 'expired' && !isExpired;
+    
+    return matchesSearch && matchesStatus && matchesTab && matchesExpiredFilter && excludesExpired;
   }) : [];
 
   const getStatusBadge = (status: string) => {

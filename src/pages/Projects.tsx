@@ -104,8 +104,10 @@ const Projects = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="newest">Newest First</SelectItem>
-                  <SelectItem value="popular">Most Popular</SelectItem>
-                  <SelectItem value="funded">Most Funded</SelectItem>
+                  <SelectItem value="oldest">Oldest First</SelectItem>
+                  <SelectItem value="most_funded">Most Funded</SelectItem>
+                  <SelectItem value="least_funded">Least Funded</SelectItem>
+                  <SelectItem value="most_liked">Most Liked</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -115,19 +117,37 @@ const Projects = () => {
         {/* Projects Grid */}
         <section className="py-8 sm:py-12">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {filteredProjects.map((project) => (
-                <ProjectCard key={project.id} project={project} />
-              ))}
-            </div>
-
-            {filteredProjects.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">No projects found matching your criteria.</p>
-                <Button variant="outline" className="mt-4" onClick={() => { setSearchQuery(''); setCategory('all'); }}>
-                  Clear Filters
-                </Button>
+            {isLoading ? (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                {[...Array(6)].map((_, index) => (
+                  <div key={index} className="bg-card rounded-lg border p-6 animate-pulse">
+                    <div className="h-4 bg-muted rounded mb-2"></div>
+                    <div className="h-3 bg-muted rounded mb-4 w-3/4"></div>
+                    <div className="h-20 bg-muted rounded mb-4"></div>
+                    <div className="flex justify-between items-center">
+                      <div className="h-3 bg-muted rounded w-1/4"></div>
+                      <div className="h-8 bg-muted rounded w-20"></div>
+                    </div>
+                  </div>
+                ))}
               </div>
+            ) : (
+              <>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                  {filteredProjects.map((project) => (
+                    <ProjectCard key={project.id} project={project} />
+                  ))}
+                </div>
+
+                {filteredProjects.length === 0 && !isLoading && (
+                  <div className="text-center py-12">
+                    <p className="text-muted-foreground">No projects found matching your criteria.</p>
+                    <Button variant="outline" className="mt-4" onClick={() => { setSearchQuery(''); setCategory('all'); }}>
+                      Clear Filters
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </section>

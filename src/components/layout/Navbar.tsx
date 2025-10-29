@@ -25,6 +25,12 @@ export const Navbar = () => {
     return '/donor/dashboard';
   };
 
+  const getProfilePath = () => {
+    if (user?.role === 'ADMIN') return '/profile';
+    if (user?.role === 'STUDENT') return '/student/profile';
+    return '/profile';
+  };
+
   const handleLogout = () => {
     logout();
     navigate('/');
@@ -107,7 +113,7 @@ export const Navbar = () => {
                     <LayoutDashboard className="mr-2 h-4 w-4" />
                     Dashboard
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/profile')}>
+                  <DropdownMenuItem onClick={() => navigate(getProfilePath())}>
                     <User className="mr-2 h-4 w-4" />
                     Profile
                   </DropdownMenuItem>

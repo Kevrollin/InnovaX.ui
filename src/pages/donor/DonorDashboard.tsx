@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Progress } from '@/components/ui/progress';
 import { 
   Heart, 
   TrendingUp, 
@@ -46,6 +45,7 @@ const DonorDashboard = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [donations, setDonations] = useState<Donation[]>([]);
   const [favoriteProjects, setFavoriteProjects] = useState<Project[]>([]);
+  const [recommendedProjects, setRecommendedProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [analytics, setAnalytics] = useState({
     totalDonated: 0,
@@ -55,19 +55,65 @@ const DonorDashboard = () => {
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Function to get user's favorite projects (liked projects)
+  const getFavoriteProjects = async (userId: string) => {
+    try {
+      const allProjects = await projectsAPI.getProjects();
+      const favoriteProjects = [];
+      
+      // Check each project's like status
+      for (const project of allProjects) {
+        try {
+          const likeStatus = await projectsAPI.getLikeStatus(project.id.toString());
+          if (likeStatus.liked) {
+            favoriteProjects.push(project);
+          }
+        } catch (error) {
+          // Skip projects that can't be checked
+          console.warn(`Could not check like status for project ${project.id}:`, error);
+        }
+      }
+      
+      return favoriteProjects;
+    } catch (error) {
+      console.error('Failed to get favorite projects:', error);
+      return [];
+    }
+  };
+
+  // Function to get recommended projects based on user's donation history
+  const getRecommendedProjects = async (donationsData: Donation[]) => {
+    try {
+      const allProjects = await projectsAPI.getProjects();
+      
+      // Get categories from user's previous donations
+      const donatedProjectIds = donationsData
+        .filter(d => d.status === 'completed' || d.status === 'confirmed')
+        .map(d => d.project_id);
+      
+      // For now, return random projects as recommendations
+      // In a real app, this would use ML or sophisticated algorithms
+      const shuffled = [...allProjects].sort(() => 0.5 - Math.random());
+      return shuffled.slice(0, 4); // Return 4 recommended projects
+    } catch (error) {
+      console.error('Failed to get recommended projects:', error);
+      return [];
+    }
+  };
+
   const calculateAnalytics = (donationsData: Donation[]) => {
     const now = new Date();
     const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     
     // Calculate total donated amount
     const totalDonated = donationsData
-      .filter(donation => donation.status === 'confirmed')
+      .filter(donation => donation.status === 'completed' || donation.status === 'confirmed')
       .reduce((sum, donation) => sum + donation.amount, 0);
     
     // Calculate unique projects supported
     const uniqueProjects = new Set(
       donationsData
-        .filter(donation => donation.status === 'confirmed')
+        .filter(donation => donation.status === 'completed' || donation.status === 'confirmed')
         .map(donation => donation.project_id)
     );
     const projectsSupported = uniqueProjects.size;
@@ -76,13 +122,13 @@ const DonorDashboard = () => {
     const thisMonthDonations = donationsData
       .filter(donation => {
         const donationDate = new Date(donation.created_at);
-        return donationDate >= thisMonth && donation.status === 'confirmed';
+        return donationDate >= thisMonth && (donation.status === 'completed' || donation.status === 'confirmed');
       })
       .reduce((sum, donation) => sum + donation.amount, 0);
     
     // Calculate impact score (percentage of successful donations)
     const totalDonations = donationsData.length;
-    const successfulDonations = donationsData.filter(d => d.status === 'confirmed').length;
+    const successfulDonations = donationsData.filter(d => d.status === 'completed' || d.status === 'confirmed').length;
     const impactScore = totalDonations > 0 ? Math.round((successfulDonations / totalDonations) * 100) : 0;
     
     setAnalytics({
@@ -104,11 +150,19 @@ const DonorDashboard = () => {
         projectsAPI.getProjects()
       ]);
       
-      const donationsData = Array.isArray(donationsResponse) ? donationsResponse : (donationsResponse as { donations: Donation[] })?.donations || [];
-      const projectsData = Array.isArray(projectsResponse) ? projectsResponse : (projectsResponse as { projects: Project[] })?.projects || [];
+      const donationsData = Array.isArray(donationsResponse) ? donationsResponse : [];
+      const projectsData = Array.isArray(projectsResponse) ? projectsResponse : [];
       
       setDonations(donationsData);
-      setFavoriteProjects(projectsData.slice(0, 2));
+      
+      // Get favorite and recommended projects
+      const [favorites, recommendations] = await Promise.all([
+        getFavoriteProjects(user.id.toString()),
+        getRecommendedProjects(donationsData)
+      ]);
+      
+      setFavoriteProjects(favorites);
+      setRecommendedProjects(recommendations);
       calculateAnalytics(donationsData);
     } catch (error) {
       console.error('Failed to refresh dashboard data:', error);
@@ -125,13 +179,20 @@ const DonorDashboard = () => {
           projectsAPI.getProjects()
         ]);
         
-        // Handle API responses - they return objects with data arrays
-        const donationsData = Array.isArray(donationsResponse) ? donationsResponse : (donationsResponse as { donations: Donation[] })?.donations || [];
-        const projectsData = Array.isArray(projectsResponse) ? projectsResponse : (projectsResponse as { projects: Project[] })?.projects || [];
+        // Handle API responses - they return arrays directly
+        const donationsData = Array.isArray(donationsResponse) ? donationsResponse : [];
+        const projectsData = Array.isArray(projectsResponse) ? projectsResponse : [];
         
         setDonations(donationsData);
-        // Show first 2 projects as favorites for now
-        setFavoriteProjects(projectsData.slice(0, 2));
+        
+        // Get favorite and recommended projects
+        const [favorites, recommendations] = await Promise.all([
+          getFavoriteProjects(user.id.toString()),
+          getRecommendedProjects(donationsData)
+        ]);
+        
+        setFavoriteProjects(favorites);
+        setRecommendedProjects(recommendations);
         
         // Calculate analytics from donations data
         calculateAnalytics(donationsData);
@@ -140,6 +201,7 @@ const DonorDashboard = () => {
         // Set empty arrays on error
         setDonations([]);
         setFavoriteProjects([]);
+        setRecommendedProjects([]);
         // Reset analytics
         setAnalytics({
           totalDonated: 0,
@@ -225,21 +287,23 @@ const DonorDashboard = () => {
   ];
 
   const filteredDonations = Array.isArray(donations) ? donations.filter(donation => {
-    const matchesSearch = donation.project?.title.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = donation.project?.title?.toLowerCase().includes(searchQuery.toLowerCase()) || false;
     const matchesStatus = filterStatus === 'all' || donation.status === filterStatus;
     return matchesSearch && matchesStatus;
   }) : [];
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
+    switch (status?.toLowerCase()) {
+      case 'completed':
       case 'confirmed':
         return <Badge className="bg-success/10 text-success border-success/20">Confirmed</Badge>;
       case 'pending':
         return <Badge className="bg-primary/10 text-primary border-primary/20">Pending</Badge>;
       case 'failed':
+      case 'cancelled':
         return <Badge className="bg-destructive/10 text-destructive border-destructive/20">Failed</Badge>;
       default:
-        return <Badge variant="secondary">{status}</Badge>;
+        return <Badge variant="secondary">{status || 'Unknown'}</Badge>;
     }
   };
 
@@ -405,10 +469,9 @@ const DonorDashboard = () => {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {favoriteProjects.length > 0 ? (
+                  {recommendedProjects.length > 0 ? (
                     <div className="grid sm:grid-cols-2 gap-4">
-                      {favoriteProjects.slice(0, 2).map((project) => {
-                        const fundingPercentage = (project.funding_raised / project.funding_goal) * 100;
+                      {recommendedProjects.slice(0, 2).map((project) => {
                         return (
                           <div key={project.id} className="p-4 rounded-lg border border-border hover:shadow-elegant transition-all duration-300">
                             <div className="flex items-start justify-between mb-3">
@@ -422,14 +485,9 @@ const DonorDashboard = () => {
                             </div>
                             
                             <div className="space-y-2 mb-3">
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-muted-foreground">Progress</span>
-                                <span className="font-semibold text-primary">{fundingPercentage.toFixed(0)}%</span>
-                              </div>
-                              <Progress value={fundingPercentage} className="h-2" />
-                              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                <span>{project.funding_raised.toLocaleString()} {project.currency}</span>
-                                <span>Goal: {project.funding_goal.toLocaleString()} {project.currency}</span>
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Badge variant="secondary">{project.category}</Badge>
+                                <Badge variant="outline">{project.difficulty_level}</Badge>
                               </div>
                             </div>
 
@@ -441,6 +499,9 @@ const DonorDashboard = () => {
                                   </AvatarFallback>
                                 </Avatar>
                                 <span className="text-xs text-muted-foreground">@{project.owner?.username}</span>
+                                {project.owner?.university && (
+                                  <span className="text-xs text-muted-foreground">• {project.owner.university}</span>
+                                )}
                               </div>
                               <Link to={`/projects/${project.id}`}>
                                 <Button size="sm" variant="outline">
@@ -499,9 +560,9 @@ const DonorDashboard = () => {
                         className="px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                       >
                         <option value="all">All Status</option>
-                        <option value="confirmed">Confirmed</option>
+                        <option value="completed">Completed</option>
                         <option value="pending">Pending</option>
-                        <option value="failed">Failed</option>
+                        <option value="cancelled">Cancelled</option>
                       </select>
                     </div>
                   </div>
@@ -582,57 +643,84 @@ const DonorDashboard = () => {
                   <CardDescription>Projects you've liked and want to follow</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {favoriteProjects.map((project) => {
-                      const fundingPercentage = (project.funding_raised / project.funding_goal) * 100;
-                      return (
-                        <div key={project.id} className="p-4 rounded-lg border border-border hover:shadow-elegant transition-all duration-300">
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex-1">
-                              <h4 className="font-semibold mb-1 line-clamp-1">{project.title}</h4>
-                              <p className="text-sm text-muted-foreground line-clamp-2">{project.short_description}</p>
-                            </div>
-                            <Button variant="ghost" size="sm" className="text-primary">
-                              <Heart className="h-4 w-4 fill-current" />
-                            </Button>
-                          </div>
-                          
-                          <div className="space-y-2 mb-3">
-                            <div className="flex items-center justify-between text-sm">
-                              <span className="text-muted-foreground">Progress</span>
-                              <span className="font-semibold text-primary">{fundingPercentage.toFixed(0)}%</span>
-                            </div>
-                            <Progress value={fundingPercentage} className="h-2" />
-                            <div className="flex items-center justify-between text-xs text-muted-foreground">
-                              <span>{project.funding_raised.toLocaleString()} {project.currency}</span>
-                              <span>Goal: {project.funding_goal.toLocaleString()} {project.currency}</span>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <Avatar className="h-6 w-6">
-                                <AvatarFallback className="text-xs">
-                                  {project.owner?.username?.charAt(0).toUpperCase()}
-                                </AvatarFallback>
-                              </Avatar>
-                              <span className="text-xs text-muted-foreground">@{project.owner?.username}</span>
-                            </div>
-                            <div className="flex gap-1">
-                              <Button size="sm" variant="outline">
-                                <Share2 className="h-3 w-3" />
+                  {favoriteProjects.length > 0 ? (
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {favoriteProjects.map((project) => {
+                        return (
+                          <div key={project.id} className="p-4 rounded-lg border border-border hover:shadow-elegant transition-all duration-300">
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex-1">
+                                <h4 className="font-semibold mb-1 line-clamp-1">{project.title}</h4>
+                                <p className="text-sm text-muted-foreground line-clamp-2">{project.short_description}</p>
+                              </div>
+                              <Button variant="ghost" size="sm" className="text-primary">
+                                <Heart className="h-4 w-4 fill-current" />
                               </Button>
-                              <Link to={`/projects/${project.id}`}>
-                                <Button size="sm">
+                            </div>
+                            
+                            <div className="space-y-2 mb-3">
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Badge variant="secondary">{project.category}</Badge>
+                                <Badge variant="outline">{project.difficulty_level}</Badge>
+                              </div>
+                              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <Heart className="h-3 w-3" />
+                                  {project.likes_count || 0} likes
+                                </span>
+                                <span className="flex items-center gap-1">
                                   <Eye className="h-3 w-3" />
+                                  {project.views_count || 0} views
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Avatar className="h-6 w-6">
+                                  <AvatarFallback className="text-xs">
+                                    {project.owner?.username?.charAt(0).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="text-xs text-muted-foreground">
+                                  <div>@{project.owner?.username}</div>
+                                  {project.owner?.university && (
+                                    <div className="text-xs">{project.owner.university}</div>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex gap-1">
+                                <Button size="sm" variant="outline">
+                                  <Share2 className="h-3 w-3" />
                                 </Button>
-                              </Link>
+                                <Link to={`/projects/${project.id}`}>
+                                  <Button size="sm">
+                                    <Eye className="h-3 w-3" />
+                                  </Button>
+                                </Link>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-6">
+                        <Heart className="h-10 w-10 text-muted-foreground" />
+                      </div>
+                      <h3 className="text-xl font-semibold mb-3">No favorite projects yet</h3>
+                      <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                        Like projects you're interested in to see them here. Start exploring and heart the ones that catch your attention!
+                      </p>
+                      <Link to="/projects">
+                        <Button size="lg">
+                          <Heart className="mr-2 h-5 w-5" />
+                          Explore Projects
+                        </Button>
+                      </Link>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

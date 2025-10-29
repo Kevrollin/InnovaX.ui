@@ -7,48 +7,62 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
 import { 
-  Plus, 
-  X, 
-  Upload, 
-  Link as LinkIcon, 
-  Target, 
-  Calendar,
-  DollarSign,
-  Image as ImageIcon,
-  Video,
-  FileText,
-  Save,
-  Eye,
   ArrowLeft,
-  Lock,
-  CheckCircle,
-  Clock,
-  XCircle
+  Save,
+  Image as ImageIcon,
+  DollarSign,
+  AlertCircle,
+  X
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuthStore } from '@/store/authStore';
 import { useAuth } from '@/hooks/useAuth';
 import { projectsAPI } from '@/services/projects';
 import { toast } from 'sonner';
-import { Project, Milestone } from '@/types';
+import { apiService } from '@/services/api';
 
 const CreateProject = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const { isVerifiedStudent, isPendingVerification, isVerificationRejected, refreshUserProfile } = useAuth();
-  const [activeTab, setActiveTab] = useState('basic');
   const [isLoading, setIsLoading] = useState(false);
-  const [isPreview, setIsPreview] = useState(false);
   const [isCheckingVerification, setIsCheckingVerification] = useState(true);
+
+  // Form state matching backend requirements
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    goalAmount: '',
+    category: '',
+    imageUrl: '',
+    bannerImage: '',
+    screenshots: [] as string[],
+    repoUrl: '',
+    demoUrl: ''
+  });
+
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [uploadingScreenshots, setUploadingScreenshots] = useState<Record<number, boolean>>({});
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [selectedBannerFile, setSelectedBannerFile] = useState<File | null>(null);
+
+  // Backend-supported categories
+  const categories = [
+    { value: 'EDUCATION', label: 'Education' },
+    { value: 'TECHNOLOGY', label: 'Technology' },
+    { value: 'HEALTH', label: 'Health' },
+    { value: 'ENVIRONMENT', label: 'Environment' },
+    { value: 'SOCIAL', label: 'Social' },
+    { value: 'ARTS', label: 'Arts' },
+    { value: 'OTHER', label: 'Other' }
+  ];
 
   useEffect(() => {
     const checkVerificationStatus = async () => {
       try {
-        // Only refresh if we don't have user data or student profile
         if (!user || !user.studentProfile) {
           await refreshUserProfile();
         }
@@ -57,10 +71,9 @@ const CreateProject = () => {
           toast.error('You need to be verified as a student to create projects');
           navigate('/student/dashboard');
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to check verification status:', error);
-        // Don't show error for rate limiting
-        if (!error.message.includes('429')) {
+        if (!error.message?.includes('429')) {
           toast.error('Failed to verify your status');
         }
         navigate('/student/dashboard');
@@ -72,163 +85,233 @@ const CreateProject = () => {
     checkVerificationStatus();
   }, [isVerifiedStudent, refreshUserProfile, navigate, user]);
 
-  // Form state
-  const [formData, setFormData] = useState({
-    title: '',
-    short_description: '',
-    description: '',
-    category: '',
-    difficulty_level: '',
-    funding_goal: '',
-    currency: 'XLM',
-    repo_url: '',
-    demo_url: '',
-    website_url: '',
-    tags: [] as string[],
-    milestones: [] as Milestone[],
-    screenshots: [] as string[],
-    videos: [] as string[],
-    documents: [] as string[]
-  });
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
 
-  const [newTag, setNewTag] = useState('');
-  const [newMilestone, setNewMilestone] = useState({
-    title: '',
-    description: '',
-    target_date: '',
-    funding_required: ''
-  });
+    if (!formData.title.trim()) {
+      newErrors.title = 'Title is required';
+    } else if (formData.title.length < 3) {
+      newErrors.title = 'Title must be at least 3 characters';
+    } else if (formData.title.length > 100) {
+      newErrors.title = 'Title must be no more than 100 characters';
+    }
 
-  const categories = [
-    'Technology',
-    'Sustainability',
-    'Social Impact',
-    'Healthcare',
-    'Education',
-    'Arts & Culture',
-    'Sports & Fitness',
-    'Business & Finance',
-    'Science & Research',
-    'Other'
-  ];
+    if (!formData.description.trim()) {
+      newErrors.description = 'Description is required';
+    } else if (formData.description.length < 10) {
+      newErrors.description = 'Description must be at least 10 characters';
+    } else if (formData.description.length > 2000) {
+      newErrors.description = 'Description must be no more than 2000 characters';
+    }
 
-  const difficultyLevels = [
-    { value: 'beginner', label: 'Beginner' },
-    { value: 'intermediate', label: 'Intermediate' },
-    { value: 'advanced', label: 'Advanced' }
-  ];
+    if (!formData.goalAmount.trim()) {
+      newErrors.goalAmount = 'Funding goal is required';
+    } else {
+      const amount = parseFloat(formData.goalAmount);
+      if (isNaN(amount) || amount <= 0) {
+        newErrors.goalAmount = 'Funding goal must be a positive number';
+      }
+    }
 
-  const handleInputChange = (field: string, value: any) => {
+    if (!formData.category) {
+      newErrors.category = 'Category is required';
+    }
+
+    // Validate optional URLs
+    if (formData.repoUrl && formData.repoUrl.trim()) {
+      try {
+        new URL(formData.repoUrl.trim());
+      } catch {
+        newErrors.repoUrl = 'GitHub URL must be a valid URL';
+      }
+    }
+
+    if (formData.demoUrl && formData.demoUrl.trim()) {
+      try {
+        new URL(formData.demoUrl.trim());
+      } catch {
+        newErrors.demoUrl = 'Demo URL must be a valid URL';
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleInputChange = (field: string, value: string | string[]) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
-  };
-
-  const handleAddTag = () => {
-    if (newTag.trim() && !formData.tags.includes(newTag.trim())) {
-      setFormData(prev => ({
-        ...prev,
-        tags: [...prev.tags, newTag.trim()]
-      }));
-      setNewTag('');
-    }
-  };
-
-  const handleRemoveTag = (tagToRemove: string) => {
-    setFormData(prev => ({
-      ...prev,
-      tags: prev.tags.filter(tag => tag !== tagToRemove)
-    }));
-  };
-
-  const handleAddMilestone = () => {
-    if (newMilestone.title && newMilestone.description && newMilestone.target_date && newMilestone.funding_required) {
-      const milestone: Milestone = {
-        title: newMilestone.title,
-        description: newMilestone.description,
-        target_date: newMilestone.target_date,
-        funding_required: parseFloat(newMilestone.funding_required)
-      };
-      
-      setFormData(prev => ({
-        ...prev,
-        milestones: [...prev.milestones, milestone]
-      }));
-      
-      setNewMilestone({
-        title: '',
-        description: '',
-        target_date: '',
-        funding_required: ''
+    // Clear error when user starts typing
+    if (errors[field]) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
       });
     }
   };
 
-  const handleRemoveMilestone = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      milestones: prev.milestones.filter((_, i) => i !== index)
-    }));
-  };
+  const handleScreenshotFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  const handleFileUpload = (type: 'screenshots' | 'videos' | 'documents', files: FileList | null) => {
-    if (files) {
-      const fileUrls = Array.from(files).map(file => URL.createObjectURL(file));
+    // Check if maximum screenshots reached
+    if (formData.screenshots.length >= 5) {
+      toast.error('Maximum 5 screenshots allowed');
+      e.target.value = '';
+      return;
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    // Validate file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image file size must be less than 5MB');
+      return;
+    }
+
+    const screenshotIndex = formData.screenshots.length;
+    setUploadingScreenshots(prev => ({ ...prev, [screenshotIndex]: true }));
+
+    try {
+      const response = await apiService.uploadImage(file);
+      const imageUrl = response.data.imageUrl;
       setFormData(prev => ({
         ...prev,
-        [type]: [...prev[type], ...fileUrls]
+        screenshots: [...prev.screenshots, imageUrl]
       }));
+      toast.success('Screenshot uploaded successfully');
+    } catch (error: any) {
+      console.error('Failed to upload screenshot:', error);
+      toast.error(error?.message || 'Failed to upload screenshot');
+    } finally {
+      setUploadingScreenshots(prev => {
+        const newState = { ...prev };
+        delete newState[screenshotIndex];
+        return newState;
+      });
+      // Reset file input
+      e.target.value = '';
     }
   };
 
-  const handleSubmit = async () => {
-    if (!formData.title || !formData.description || !formData.funding_goal) {
-      toast.error('Please fill in all required fields');
+  const handleRemoveScreenshot = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      screenshots: prev.screenshots.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleImageFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    // Validate file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image file size must be less than 5MB');
+      return;
+    }
+
+    setSelectedImageFile(file);
+    setUploadingImage(true);
+
+    try {
+      const response = await apiService.uploadImage(file);
+      const imageUrl = response.data.imageUrl;
+      handleInputChange('imageUrl', imageUrl);
+      toast.success('Image uploaded successfully');
+      setSelectedImageFile(null);
+    } catch (error: any) {
+      console.error('Failed to upload image:', error);
+      toast.error(error?.message || 'Failed to upload image');
+    } finally {
+      setUploadingImage(false);
+      // Reset file input
+      e.target.value = '';
+    }
+  };
+
+  const handleBannerFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    // Validate file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image file size must be less than 5MB');
+      return;
+    }
+
+    setSelectedBannerFile(file);
+    setUploadingBanner(true);
+
+    try {
+      const response = await apiService.uploadImage(file);
+      const imageUrl = response.data.imageUrl;
+      handleInputChange('bannerImage', imageUrl);
+      toast.success('Banner image uploaded successfully');
+      setSelectedBannerFile(null);
+    } catch (error: any) {
+      console.error('Failed to upload banner image:', error);
+      toast.error(error?.message || 'Failed to upload banner image');
+    } finally {
+      setUploadingBanner(false);
+      // Reset file input
+      e.target.value = '';
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!validateForm()) {
+      toast.error('Please fix the errors in the form');
       return;
     }
 
     setIsLoading(true);
     
     try {
-      await projectsAPI.createProject(formData);
-      toast.success('Project created successfully!');
-      setIsLoading(false);
-      navigate('/student/dashboard');
-    } catch (error) {
-      toast.error('Failed to create project. Please try again.');
-      setIsLoading(false);
-    }
-  };
+      const projectData = {
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+        goalAmount: parseFloat(formData.goalAmount),
+        category: formData.category,
+        imageUrl: formData.imageUrl || undefined,
+        bannerImage: formData.bannerImage || undefined,
+        screenshots: formData.screenshots.length > 0 ? formData.screenshots : undefined,
+        repo_url: formData.repoUrl.trim() || undefined,
+        demo_url: formData.demoUrl.trim() || undefined
+      };
 
-  // TODO: Create project preview object from form data
-  const projectPreview: Project = {
-    id: 0,
-    owner_id: user?.id || 0,
-    title: formData.title || 'Your Project Title',
-    description: formData.description || 'Your project description will appear here...',
-    short_description: formData.short_description || 'A brief description of your project',
-    funding_goal: parseFloat(formData.funding_goal) || 0,
-    currency: formData.currency,
-    tags: formData.tags,
-    category: formData.category,
-    difficulty_level: formData.difficulty_level as any,
-    milestones: formData.milestones,
-    status: 'draft',
-    is_featured: false,
-    is_public: false,
-    funding_raised: 0,
-    views_count: 0,
-    likes_count: 0,
-    shares_count: 0,
-    screenshots: formData.screenshots,
-    videos: formData.videos,
-    documents: formData.documents,
-    created_at: new Date().toISOString(),
-    owner: {
-      id: user?.id || 0,
-      username: user?.username || 'user',
-      full_name: user?.full_name
+      await projectsAPI.createProject(projectData);
+      toast.success('Project created successfully!');
+      navigate('/student/dashboard');
+    } catch (error: any) {
+      console.error('Failed to create project:', error);
+      const errorMessage = error?.details?.errors?.[0]?.msg || 
+                          error?.message || 
+                          'Failed to create project. Please try again.';
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -254,15 +337,7 @@ const CreateProject = () => {
             <Card className="max-w-2xl mx-auto border-red-500/20 bg-red-500/5">
               <CardContent className="pt-6">
                 <div className="text-center">
-                  <div className="flex justify-center mb-4">
-                    {isPendingVerification() ? (
-                      <Clock className="h-16 w-16 text-yellow-500" />
-                    ) : isVerificationRejected() ? (
-                      <XCircle className="h-16 w-16 text-red-500" />
-                    ) : (
-                      <Lock className="h-16 w-16 text-gray-500" />
-                    )}
-                  </div>
+                  <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
                   <h2 className="text-2xl font-bold mb-4">
                     {isPendingVerification() ? 'Verification Pending' : 
                      isVerificationRejected() ? 'Verification Required' : 
@@ -279,11 +354,6 @@ const CreateProject = () => {
                     <Button variant="outline" onClick={() => navigate('/student/dashboard')}>
                       Back to Dashboard
                     </Button>
-                    {isVerificationRejected() && (
-                      <Button onClick={() => navigate('/student/profile')}>
-                        Update Profile
-                      </Button>
-                    )}
                   </div>
                 </div>
               </CardContent>
@@ -313,7 +383,6 @@ const CreateProject = () => {
                 </h1>
                 <p className="text-muted-foreground">Share your innovative ideas with the world</p>
               </div>
-              <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
                   onClick={() => navigate('/student/dashboard')}
@@ -321,501 +390,316 @@ const CreateProject = () => {
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Back to Dashboard
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setIsPreview(!isPreview)}
-                >
-                  <Eye className="mr-2 h-4 w-4" />
-                  {isPreview ? 'Edit' : 'Preview'}
-                </Button>
-              </div>
             </div>
           </motion.div>
 
-          {isPreview ? (
-            /* Preview Mode */
+          {/* Form */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="max-w-4xl mx-auto"
+            className="max-w-3xl mx-auto"
             >
               <Card className="border-border bg-card">
                 <CardHeader>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Badge variant="secondary">{formData.category || 'Category'}</Badge>
-                    <Badge variant="outline">{formData.difficulty_level || 'Difficulty'}</Badge>
-                    <Badge className="bg-primary/10 text-primary">Draft</Badge>
-                  </div>
-                  <h2 className="text-2xl font-heading font-bold">{formData.title || 'Project Title'}</h2>
-                  <p className="text-muted-foreground">{formData.short_description || 'Short description'}</p>
+                <CardTitle>Project Information</CardTitle>
+                <CardDescription>
+                  Fill in the details about your project. All fields marked with * are required.
+                </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                  <div>
-                    <h3 className="font-semibold mb-2">Description</h3>
-                    <div className="prose prose-invert max-w-none">
-                      {formData.description.split('\n').map((paragraph, index) => (
-                        <p key={index} className="mb-4 text-muted-foreground">
-                          {paragraph}
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-
-                  {formData.tags.length > 0 && (
-                    <div>
-                      <h3 className="font-semibold mb-2">Tags</h3>
-                      <div className="flex flex-wrap gap-2">
-                        {formData.tags.map((tag) => (
-                          <Badge key={tag} variant="secondary">{tag}</Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {formData.milestones.length > 0 && (
-                    <div>
-                      <h3 className="font-semibold mb-2">Milestones</h3>
-                      <div className="space-y-3">
-                        {formData.milestones.map((milestone, index) => (
-                          <div key={index} className="p-3 rounded-lg border border-border">
-                            <h4 className="font-medium">{milestone.title}</h4>
-                            <p className="text-sm text-muted-foreground mb-2">{milestone.description}</p>
-                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                              <span>Target: {new Date(milestone.target_date).toLocaleDateString()}</span>
-                              <span>Funding: {milestone.funding_required} {formData.currency}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-4 rounded-lg border border-border">
-                      <h4 className="font-semibold text-primary">Funding Goal</h4>
-                      <p className="text-2xl font-bold">{formData.funding_goal} {formData.currency}</p>
-                    </div>
-                    <div className="p-4 rounded-lg border border-border">
-                      <h4 className="font-semibold text-accent">Status</h4>
-                      <p className="text-lg">Draft - Not Published</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ) : (
-            /* Edit Mode */
-            <div className="max-w-4xl mx-auto">
-              <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-4 mb-6">
-                  <TabsTrigger value="basic">Basic Info</TabsTrigger>
-                  <TabsTrigger value="details">Details</TabsTrigger>
-                  <TabsTrigger value="media">Media</TabsTrigger>
-                  <TabsTrigger value="milestones">Milestones</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="basic" className="space-y-6">
-                  <Card className="border-border bg-card">
-                    <CardHeader>
-                      <CardTitle>Basic Information</CardTitle>
-                      <CardDescription>Tell us about your project</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
+              <CardContent>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  {/* Title */}
                       <div className="space-y-2">
-                        <Label htmlFor="title">Project Title *</Label>
+                    <Label htmlFor="title">
+                      Project Title <span className="text-destructive">*</span>
+                    </Label>
                         <Input
                           id="title"
-                          placeholder="Enter your project title"
+                      placeholder="Enter your project title (3-100 characters)"
                           value={formData.title}
                           onChange={(e) => handleInputChange('title', e.target.value)}
-                        />
+                      className={errors.title ? 'border-destructive' : ''}
+                    />
+                    {errors.title && (
+                      <p className="text-sm text-destructive flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        {errors.title}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      {formData.title.length}/100 characters
+                    </p>
                       </div>
 
+                  {/* Description */}
                       <div className="space-y-2">
-                        <Label htmlFor="short_description">Short Description *</Label>
+                    <Label htmlFor="description">
+                      Description <span className="text-destructive">*</span>
+                    </Label>
                         <Textarea
-                          id="short_description"
-                          placeholder="Brief description of your project (max 500 characters)"
-                          value={formData.short_description}
-                          onChange={(e) => handleInputChange('short_description', e.target.value)}
-                          maxLength={500}
-                          rows={3}
-                        />
+                      id="description"
+                      placeholder="Describe your project in detail. What problem does it solve? How does it work? What makes it unique? (10-2000 characters)"
+                      value={formData.description}
+                      onChange={(e) => handleInputChange('description', e.target.value)}
+                      rows={8}
+                      className={errors.description ? 'border-destructive' : ''}
+                    />
+                    {errors.description && (
+                      <p className="text-sm text-destructive flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        {errors.description}
+                      </p>
+                    )}
                         <p className="text-xs text-muted-foreground">
-                          {formData.short_description.length}/500 characters
+                      {formData.description.length}/2000 characters
                         </p>
                       </div>
 
+                  {/* Funding Goal and Category */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label htmlFor="category">Category *</Label>
-                          <Select value={formData.category} onValueChange={(value) => handleInputChange('category', value)}>
-                            <SelectTrigger>
+                      <Label htmlFor="goalAmount">
+                        <DollarSign className="inline h-4 w-4 mr-1" />
+                        Funding Goal <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="goalAmount"
+                        type="number"
+                        placeholder="10000"
+                        min="1"
+                        step="0.01"
+                        value={formData.goalAmount}
+                        onChange={(e) => handleInputChange('goalAmount', e.target.value)}
+                        className={errors.goalAmount ? 'border-destructive' : ''}
+                      />
+                      {errors.goalAmount && (
+                        <p className="text-sm text-destructive flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" />
+                          {errors.goalAmount}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="category">
+                        Category <span className="text-destructive">*</span>
+                      </Label>
+                      <Select 
+                        value={formData.category} 
+                        onValueChange={(value) => handleInputChange('category', value)}
+                      >
+                        <SelectTrigger className={errors.category ? 'border-destructive' : ''}>
                               <SelectValue placeholder="Select category" />
                             </SelectTrigger>
                             <SelectContent>
                               {categories.map((category) => (
-                                <SelectItem key={category} value={category}>
-                                  {category}
+                            <SelectItem key={category.value} value={category.value}>
+                              {category.label}
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="difficulty">Difficulty Level</Label>
-                          <Select value={formData.difficulty_level} onValueChange={(value) => handleInputChange('difficulty_level', value)}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select difficulty" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {difficultyLevels.map((level) => (
-                                <SelectItem key={level.value} value={level.value}>
-                                  {level.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="funding_goal">Funding Goal *</Label>
-                          <div className="flex">
-                            <Input
-                              id="funding_goal"
-                              type="number"
-                              placeholder="10000"
-                              value={formData.funding_goal}
-                              onChange={(e) => handleInputChange('funding_goal', e.target.value)}
-                              className="rounded-r-none"
-                            />
-                            <Select value={formData.currency} onValueChange={(value) => handleInputChange('currency', value)}>
-                              <SelectTrigger className="w-20 rounded-l-none border-l-0">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="XLM">XLM</SelectItem>
-                                <SelectItem value="USDC">USDC</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                <TabsContent value="details" className="space-y-6">
-                  <Card className="border-border bg-card">
-                    <CardHeader>
-                      <CardTitle>Project Details</CardTitle>
-                      <CardDescription>Provide detailed information about your project</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="description">Full Description *</Label>
-                        <Textarea
-                          id="description"
-                          placeholder="Describe your project in detail. What problem does it solve? How does it work? What makes it unique?"
-                          value={formData.description}
-                          onChange={(e) => handleInputChange('description', e.target.value)}
-                          rows={8}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="tags">Tags</Label>
-                        <div className="space-y-2">
-                          <div className="flex gap-2">
-                            <Input
-                              placeholder="Add a tag"
-                              value={newTag}
-                              onChange={(e) => setNewTag(e.target.value)}
-                              onKeyPress={(e) => e.key === 'Enter' && handleAddTag()}
-                            />
-                            <Button type="button" onClick={handleAddTag} size="sm">
-                              <Plus className="h-4 w-4" />
-                            </Button>
-                          </div>
-                          {formData.tags.length > 0 && (
-                            <div className="flex flex-wrap gap-2">
-                              {formData.tags.map((tag) => (
-                                <Badge key={tag} variant="secondary" className="flex items-center gap-1">
-                                  {tag}
-                                  <X
-                                    className="h-3 w-3 cursor-pointer"
-                                    onClick={() => handleRemoveTag(tag)}
-                                  />
-                                </Badge>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <Separator />
-
-                      <div className="space-y-4">
-                        <h3 className="font-semibold">Project Links</h3>
-                        
-                        <div className="space-y-2">
-                          <Label htmlFor="repo_url">GitHub Repository</Label>
-                          <div className="flex">
-                            <LinkIcon className="h-4 w-4 m-3 text-muted-foreground" />
-                            <Input
-                              id="repo_url"
-                              placeholder="https://github.com/username/repository"
-                              value={formData.repo_url}
-                              onChange={(e) => handleInputChange('repo_url', e.target.value)}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="demo_url">Demo URL</Label>
-                          <div className="flex">
-                            <LinkIcon className="h-4 w-4 m-3 text-muted-foreground" />
-                            <Input
-                              id="demo_url"
-                              placeholder="https://demo.yourproject.com"
-                              value={formData.demo_url}
-                              onChange={(e) => handleInputChange('demo_url', e.target.value)}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="website_url">Project Website</Label>
-                          <div className="flex">
-                            <LinkIcon className="h-4 w-4 m-3 text-muted-foreground" />
-                            <Input
-                              id="website_url"
-                              placeholder="https://yourproject.com"
-                              value={formData.website_url}
-                              onChange={(e) => handleInputChange('website_url', e.target.value)}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                <TabsContent value="media" className="space-y-6">
-                  <Card className="border-border bg-card">
-                    <CardHeader>
-                      <CardTitle>Media & Files</CardTitle>
-                      <CardDescription>Upload images, videos, and documents</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      <div className="space-y-4">
-                        <div>
-                          <Label>Screenshots</Label>
-                          <div className="mt-2">
-                            <input
-                              type="file"
-                              multiple
-                              accept="image/*"
-                              onChange={(e) => handleFileUpload('screenshots', e.target.files)}
-                              className="hidden"
-                              id="screenshots-upload"
-                            />
-                            <label
-                              htmlFor="screenshots-upload"
-                              className="flex items-center justify-center w-full h-32 border-2 border-dashed border-border rounded-lg cursor-pointer hover:bg-card/50 transition-colors"
-                            >
-                              <div className="text-center">
-                                <ImageIcon className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                                <p className="text-sm text-muted-foreground">Upload screenshots</p>
-                              </div>
-                            </label>
-                          </div>
-                          {formData.screenshots.length > 0 && (
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-4">
-                              {formData.screenshots.map((screenshot, index) => (
-                                <div key={index} className="relative">
-                                  <img
-                                    src={screenshot}
-                                    alt={`Screenshot ${index + 1}`}
-                                    className="w-full h-20 object-cover rounded-lg"
-                                  />
-                                  <Button
-                                    size="sm"
-                                    variant="destructive"
-                                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
-                                    onClick={() => {
-                                      const newScreenshots = formData.screenshots.filter((_, i) => i !== index);
-                                      handleInputChange('screenshots', newScreenshots);
-                                    }}
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
-                        <div>
-                          <Label>Videos</Label>
-                          <div className="mt-2">
-                            <input
-                              type="file"
-                              multiple
-                              accept="video/*"
-                              onChange={(e) => handleFileUpload('videos', e.target.files)}
-                              className="hidden"
-                              id="videos-upload"
-                            />
-                            <label
-                              htmlFor="videos-upload"
-                              className="flex items-center justify-center w-full h-32 border-2 border-dashed border-border rounded-lg cursor-pointer hover:bg-card/50 transition-colors"
-                            >
-                              <div className="text-center">
-                                <Video className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                                <p className="text-sm text-muted-foreground">Upload videos</p>
-                              </div>
-                            </label>
-                          </div>
-                        </div>
-
-                        <div>
-                          <Label>Documents</Label>
-                          <div className="mt-2">
-                            <input
-                              type="file"
-                              multiple
-                              accept=".pdf,.doc,.docx,.txt"
-                              onChange={(e) => handleFileUpload('documents', e.target.files)}
-                              className="hidden"
-                              id="documents-upload"
-                            />
-                            <label
-                              htmlFor="documents-upload"
-                              className="flex items-center justify-center w-full h-32 border-2 border-dashed border-border rounded-lg cursor-pointer hover:bg-card/50 transition-colors"
-                            >
-                              <div className="text-center">
-                                <FileText className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                                <p className="text-sm text-muted-foreground">Upload documents</p>
-                              </div>
-                            </label>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                <TabsContent value="milestones" className="space-y-6">
-                  <Card className="border-border bg-card">
-                    <CardHeader>
-                      <CardTitle>Project Milestones</CardTitle>
-                      <CardDescription>Define key milestones and funding requirements</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="milestone-title">Milestone Title</Label>
-                          <Input
-                            id="milestone-title"
-                            placeholder="e.g., MVP Development"
-                            value={newMilestone.title}
-                            onChange={(e) => setNewMilestone(prev => ({ ...prev, title: e.target.value }))}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="milestone-date">Target Date</Label>
-                          <Input
-                            id="milestone-date"
-                            type="date"
-                            value={newMilestone.target_date}
-                            onChange={(e) => setNewMilestone(prev => ({ ...prev, target_date: e.target.value }))}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="milestone-description">Description</Label>
-                        <Textarea
-                          id="milestone-description"
-                          placeholder="Describe what this milestone involves"
-                          value={newMilestone.description}
-                          onChange={(e) => setNewMilestone(prev => ({ ...prev, description: e.target.value }))}
-                          rows={3}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="milestone-funding">Funding Required</Label>
-                        <div className="flex">
-                          <Input
-                            id="milestone-funding"
-                            type="number"
-                            placeholder="1000"
-                            value={newMilestone.funding_required}
-                            onChange={(e) => setNewMilestone(prev => ({ ...prev, funding_required: e.target.value }))}
-                            className="rounded-r-none"
-                          />
-                          <div className="flex items-center px-3 bg-secondary rounded-r-md border border-l-0 border-border">
-                            <span className="text-sm text-muted-foreground">{formData.currency}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <Button onClick={handleAddMilestone} className="w-full">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add Milestone
-                      </Button>
-
-                      {formData.milestones.length > 0 && (
-                        <div className="space-y-3">
-                          <Separator />
-                          <h4 className="font-semibold">Added Milestones</h4>
-                          {formData.milestones.map((milestone, index) => (
-                            <div key={index} className="flex items-start gap-4 p-4 rounded-lg border border-border">
-                              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                <span className="text-sm font-semibold text-primary">{index + 1}</span>
-                              </div>
-                              <div className="flex-1">
-                                <h5 className="font-semibold">{milestone.title}</h5>
-                                <p className="text-sm text-muted-foreground mb-2">{milestone.description}</p>
-                                <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                                  <div className="flex items-center gap-1">
-                                    <Calendar className="h-3 w-3" />
-                                    {new Date(milestone.target_date).toLocaleDateString()}
-                                  </div>
-                                  <div className="flex items-center gap-1">
-                                    <DollarSign className="h-3 w-3" />
-                                    {milestone.funding_required} {formData.currency}
-                                  </div>
-                                </div>
-                              </div>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleRemoveMilestone(index)}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
+                      {errors.category && (
+                        <p className="text-sm text-destructive flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" />
+                          {errors.category}
+                        </p>
                       )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
+                    </div>
+                  </div>
+
+                  {/* GitHub and Demo URLs */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="repoUrl">
+                        GitHub Repository URL (Optional)
+                      </Label>
+                      <Input
+                        id="repoUrl"
+                        type="url"
+                        placeholder="https://github.com/username/repository"
+                        value={formData.repoUrl}
+                        onChange={(e) => handleInputChange('repoUrl', e.target.value)}
+                        className={errors.repoUrl ? 'border-destructive' : ''}
+                      />
+                      {errors.repoUrl && (
+                        <p className="text-sm text-destructive flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" />
+                          {errors.repoUrl}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="demoUrl">
+                        Demo/Live URL (Optional)
+                      </Label>
+                      <Input
+                        id="demoUrl"
+                        type="url"
+                        placeholder="https://your-demo-url.com"
+                        value={formData.demoUrl}
+                        onChange={(e) => handleInputChange('demoUrl', e.target.value)}
+                        className={errors.demoUrl ? 'border-destructive' : ''}
+                      />
+                      {errors.demoUrl && (
+                        <p className="text-sm text-destructive flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" />
+                          {errors.demoUrl}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Image File Uploads */}
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="imageFile">
+                          <ImageIcon className="inline h-4 w-4 mr-1" />
+                          Project Image (Optional)
+                        </Label>
+                        <div className="space-y-2">
+                          <Input
+                            id="imageFile"
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageFileSelect}
+                            disabled={uploadingImage}
+                            className="text-sm"
+                          />
+                          {uploadingImage && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary inline-block"></span>
+                              Uploading image...
+                            </p>
+                          )}
+                          {formData.imageUrl && !uploadingImage && (
+                            <div className="mt-2">
+                              <img 
+                                src={formData.imageUrl} 
+                                alt="Preview" 
+                                className="w-full h-32 object-cover rounded border"
+                              />
+                            </div>
+                          )}
+                        </div>
+                        {errors.imageUrl && (
+                          <p className="text-sm text-destructive flex items-center gap-1">
+                            <AlertCircle className="h-3 w-3" />
+                            {errors.imageUrl}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="bannerFile">
+                          <ImageIcon className="inline h-4 w-4 mr-1" />
+                          Banner Image (Optional)
+                        </Label>
+                        <div className="space-y-2">
+                          <Input
+                            id="bannerFile"
+                            type="file"
+                            accept="image/*"
+                            onChange={handleBannerFileSelect}
+                            disabled={uploadingBanner}
+                            className="text-sm"
+                          />
+                          {uploadingBanner && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary inline-block"></span>
+                              Uploading banner...
+                            </p>
+                          )}
+                          {formData.bannerImage && !uploadingBanner && (
+                            <div className="mt-2">
+                              <img 
+                                src={formData.bannerImage} 
+                                alt="Banner Preview" 
+                                className="w-full h-32 object-cover rounded border"
+                              />
+                            </div>
+                          )}
+                        </div>
+                        {errors.bannerImage && (
+                          <p className="text-sm text-destructive flex items-center gap-1">
+                            <AlertCircle className="h-3 w-3" />
+                            {errors.bannerImage}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Screenshots */}
+                    <div className="space-y-2">
+                      <Label htmlFor="screenshotFile">
+                        <ImageIcon className="inline h-4 w-4 mr-1" />
+                        Screenshots (Optional) - Max 5
+                        {formData.screenshots.length > 0 && (
+                          <span className="text-muted-foreground ml-2">
+                            ({formData.screenshots.length}/5)
+                          </span>
+                        )}
+                      </Label>
+                      <div className="space-y-2">
+                        <Input
+                          id="screenshotFile"
+                          type="file"
+                          accept="image/*"
+                          onChange={handleScreenshotFileSelect}
+                          disabled={
+                            Object.values(uploadingScreenshots).some(loading => loading) ||
+                            formData.screenshots.length >= 5
+                          }
+                          className="text-sm"
+                        />
+                        {formData.screenshots.length >= 5 && (
+                          <p className="text-xs text-muted-foreground">
+                            Maximum of 5 screenshots reached. Remove one to add another.
+                          </p>
+                        )}
+                        {Object.values(uploadingScreenshots).some(loading => loading) && (
+                          <p className="text-xs text-muted-foreground flex items-center gap-1">
+                            <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary inline-block"></span>
+                            Uploading screenshot...
+                          </p>
+                        )}
+                        {formData.screenshots.length > 0 && (
+                          <div className="space-y-2 mt-2">
+                            {formData.screenshots.map((screenshot, index) => (
+                              <div key={index} className="flex items-center gap-2 p-2 border rounded-md">
+                                <img 
+                                  src={screenshot} 
+                                  alt={`Screenshot ${index + 1}`}
+                                  className="w-16 h-16 object-cover rounded"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="64" height="64"%3E%3Crect width="64" height="64" fill="%23ccc"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999"%3EImage%3C/text%3E%3C/svg%3E';
+                                  }}
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm truncate text-muted-foreground">Screenshot {index + 1}</p>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRemoveScreenshot(index)}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
               {/* Action Buttons */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex flex-col sm:flex-row gap-4 mt-8"
-              >
+                  <div className="flex flex-col sm:flex-row gap-4 pt-4">
                 <Button
+                      type="button"
                   variant="outline"
                   onClick={() => navigate('/student/dashboard')}
                   className="w-full sm:w-auto"
@@ -823,7 +707,7 @@ const CreateProject = () => {
                   Cancel
                 </Button>
                 <Button
-                  onClick={handleSubmit}
+                      type="submit"
                   disabled={isLoading}
                   className="w-full sm:w-auto shadow-glow"
                 >
@@ -839,9 +723,11 @@ const CreateProject = () => {
                     </>
                   )}
                 </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
               </motion.div>
-            </div>
-          )}
         </div>
       </main>
     </div>

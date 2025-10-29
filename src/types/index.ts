@@ -7,6 +7,7 @@ export interface User {
   username: string;
   email: string;
   fullName?: string;
+  bio?: string;
   phone?: string;
   profilePicture?: string;
   role: UserRole;
@@ -30,6 +31,10 @@ export interface StudentProfile {
   verificationMessage?: string;
   verifiedAt?: string;
   createdAt: string;
+  // Socials
+  twitterUrl?: string;
+  linkedinUrl?: string;
+  githubUrl?: string;
 }
 
 // Project Types
@@ -58,6 +63,7 @@ export interface Project {
   views_count: number;
   likes_count: number;
   shares_count: number;
+  banner_image?: string;
   screenshots?: string[];
   videos?: string[];
   documents?: string[];
@@ -68,6 +74,10 @@ export interface Project {
     id: number;
     username: string;
     full_name?: string;
+    university?: string;
+    twitter_url?: string;
+    linkedin_url?: string;
+    github_url?: string;
   };
 }
 

@@ -138,11 +138,13 @@ export const campaignsAPI = {
   async getCampaigns(params?: {
     search?: string;
     status?: string;
+    includeExpired?: boolean;
   }): Promise<Campaign[]> {
     try {
       const queryParams = new URLSearchParams();
       if (params?.search) queryParams.append('search', params.search);
       if (params?.status) queryParams.append('status', params.status);
+      if (params?.includeExpired) queryParams.append('includeExpired', 'true');
 
       const queryString = queryParams.toString();
       const endpoint = queryString ? `/api/campaigns?${queryString}` : '/api/campaigns';

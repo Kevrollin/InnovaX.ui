@@ -101,6 +101,7 @@ const AdminCampaigns = () => {
       const data = await campaignsAPI.getCampaigns({
         search: searchTerm || undefined,
         status: filterStatus !== 'all' ? filterStatus : undefined,
+        includeExpired: true, // Admin should see all campaigns including expired ones
       });
       setCampaigns(data);
     } catch (error) {
@@ -276,9 +277,20 @@ const AdminCampaigns = () => {
     setIsDetailsOpen(true);
   };
 
+  // Check if campaign is expired
+  const isCampaignExpired = (campaign: Campaign) => {
+    return new Date(campaign.endDate) < new Date();
+  };
+
   // Get status badge variant
-  const getStatusBadge = (status: string) => {
-    switch (status) {
+  const getStatusBadge = (campaign: Campaign) => {
+    const isExpired = isCampaignExpired(campaign);
+    
+    if (isExpired && campaign.status === 'active') {
+      return <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-300">Expired</Badge>;
+    }
+    
+    switch (campaign.status) {
       case 'active':
         return <Badge variant="default" className="bg-green-600">Active</Badge>;
       case 'draft':
@@ -288,13 +300,19 @@ const AdminCampaigns = () => {
       case 'cancelled':
         return <Badge variant="destructive">Cancelled</Badge>;
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return <Badge variant="outline">{campaign.status}</Badge>;
     }
   };
 
   // Get status icon
-  const getStatusIcon = (status: string) => {
-    switch (status) {
+  const getStatusIcon = (campaign: Campaign) => {
+    const isExpired = isCampaignExpired(campaign);
+    
+    if (isExpired && campaign.status === 'active') {
+      return <AlertTriangle className="h-4 w-4 text-orange-600" />;
+    }
+    
+    switch (campaign.status) {
       case 'active':
         return <CheckCircle className="h-4 w-4 text-green-600" />;
       case 'draft':
@@ -888,8 +906,8 @@ const AdminCampaigns = () => {
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center space-x-2">
-                              {getStatusIcon(campaign.status)}
-                              {getStatusBadge(campaign.status)}
+                              {getStatusIcon(campaign)}
+                              {getStatusBadge(campaign)}
                             </div>
                           </TableCell>
                           <TableCell>

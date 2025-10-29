@@ -32,42 +32,51 @@ import {
   GraduationCap,
   BookOpen,
   Clock,
+  Plus,
   XCircle
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuthStore } from '@/store/authStore';
 import { useAuth } from '@/hooks/useAuth';
 import { authAPI } from '@/services/auth';
+import { apiService } from '@/services/api';
 import { toast } from 'sonner';
 
 const StudentProfile = () => {
   const { user, setUser } = useAuthStore();
   const { isVerifiedStudent, isPendingVerification, isVerificationRejected, refreshUserProfile } = useAuth();
+  const isStudentRole = user?.role === 'STUDENT';
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
-    full_name: user?.full_name || '',
+    full_name: user?.fullName || '',
     email: user?.email || '',
     phone: user?.phone || '',
     bio: user?.bio || '',
-    school_email: user?.student_profile?.school_email || '',
-    school_name: user?.student_profile?.school_name || '',
-    admission_number: user?.student_profile?.admission_number || '',
-    id_number: user?.student_profile?.id_number || '',
+    school_email: user?.studentProfile?.schoolEmail || '',
+    school_name: user?.studentProfile?.schoolName || '',
+    admission_number: user?.studentProfile?.admissionNumber || '',
+    id_number: user?.studentProfile?.idNumber || '',
+    twitter_url: user?.studentProfile?.twitterUrl || '',
+    linkedin_url: user?.studentProfile?.linkedinUrl || '',
+    github_url: user?.studentProfile?.githubUrl || '',
   });
 
   useEffect(() => {
     if (user) {
       setFormData({
-        full_name: user.full_name || '',
+        full_name: user.fullName || '',
         email: user.email || '',
         phone: user.phone || '',
         bio: user.bio || '',
-        school_email: user.student_profile?.school_email || '',
-        school_name: user.student_profile?.school_name || '',
-        admission_number: user.student_profile?.admission_number || '',
-        id_number: user.student_profile?.id_number || '',
+        school_email: user.studentProfile?.schoolEmail || '',
+        school_name: user.studentProfile?.schoolName || '',
+        admission_number: user.studentProfile?.admissionNumber || '',
+        id_number: user.studentProfile?.idNumber || '',
+        twitter_url: user.studentProfile?.twitterUrl || '',
+        linkedin_url: user.studentProfile?.linkedinUrl || '',
+        github_url: user.studentProfile?.githubUrl || '',
       });
     }
   }, [user]);
@@ -85,9 +94,18 @@ const StudentProfile = () => {
     
     setIsLoading(true);
     try {
-      // Here you would call the API to update the profile
-      // const updatedUser = await authAPI.updateProfile(formData);
-      // setUser(updatedUser);
+      // Update student profile (socials + academic)
+      const payload: any = {
+        schoolEmail: formData.school_email,
+        schoolName: formData.school_name,
+        admissionNumber: formData.admission_number,
+        idNumber: formData.id_number,
+        twitterUrl: formData.twitter_url || undefined,
+        linkedinUrl: formData.linkedin_url || undefined,
+        githubUrl: formData.github_url || undefined,
+      };
+      await apiService.updateStudentProfile(payload);
+      await refreshUserProfile();
       
       toast.success('Profile updated successfully!');
       setIsEditing(false);
@@ -102,14 +120,17 @@ const StudentProfile = () => {
   const handleCancelEdit = () => {
     if (user) {
       setFormData({
-        full_name: user.full_name || '',
+        full_name: user.fullName || '',
         email: user.email || '',
         phone: user.phone || '',
         bio: user.bio || '',
-        school_email: user.student_profile?.school_email || '',
-        school_name: user.student_profile?.school_name || '',
-        admission_number: user.student_profile?.admission_number || '',
-        id_number: user.student_profile?.id_number || '',
+        school_email: user.studentProfile?.schoolEmail || '',
+        school_name: user.studentProfile?.schoolName || '',
+        admission_number: user.studentProfile?.admissionNumber || '',
+        id_number: user.studentProfile?.idNumber || '',
+        twitter_url: user.studentProfile?.twitterUrl || '',
+        linkedin_url: user.studentProfile?.linkedinUrl || '',
+        github_url: user.studentProfile?.githubUrl || '',
       });
     }
     setIsEditing(false);
@@ -195,11 +216,18 @@ const StudentProfile = () => {
             {/* Profile Details */}
             <div className="lg:col-span-2">
               <Tabs defaultValue="profile" className="space-y-6">
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="profile">Profile</TabsTrigger>
-                  <TabsTrigger value="academic">Academic</TabsTrigger>
-                  <TabsTrigger value="projects">Projects</TabsTrigger>
-                  <TabsTrigger value="settings">Settings</TabsTrigger>
+                <TabsList className="flex w-full gap-2 overflow-x-auto whitespace-nowrap">
+                  <TabsTrigger className="shrink-0" value="profile">Profile</TabsTrigger>
+                  {isStudentRole && (
+                    <TabsTrigger className="shrink-0" value="academic">Academic</TabsTrigger>
+                  )}
+                  {/*isStudentRole && (
+                    <TabsTrigger className="shrink-0" value="projects">Projects</TabsTrigger>
+                  )*/}
+                  <TabsTrigger className="shrink-0" value="settings">Settings</TabsTrigger>
+                  {isStudentRole && (
+                    <TabsTrigger className="shrink-0" value="socials">Socials</TabsTrigger>
+                  )}
                 </TabsList>
 
                 <TabsContent value="profile" className="space-y-6">
@@ -263,6 +291,7 @@ const StudentProfile = () => {
                   </Card>
                 </TabsContent>
 
+                {isStudentRole && (
                 <TabsContent value="academic" className="space-y-6">
                   {/* Verification Status Card */}
                   <Card className={`border-border ${
@@ -383,7 +412,9 @@ const StudentProfile = () => {
                     </CardContent>
                   </Card>
                 </TabsContent>
+                )}
 
+                {isStudentRole && (
                 <TabsContent value="projects" className="space-y-6">
                   <Card className="border-border">
                     <CardHeader>
@@ -410,6 +441,7 @@ const StudentProfile = () => {
                     </CardContent>
                   </Card>
                 </TabsContent>
+                )}
 
                 <TabsContent value="settings" className="space-y-6">
                   <Card className="border-border">
@@ -437,6 +469,62 @@ const StudentProfile = () => {
                     </CardContent>
                   </Card>
                 </TabsContent>
+
+                {isStudentRole && (
+                <TabsContent value="socials" className="space-y-6">
+                  <Card className="border-border">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Globe className="h-5 w-5" />
+                        Social Links
+                      </CardTitle>
+                      <CardDescription>
+                        Add your public social profiles. These will appear on your project pages.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="twitter_url">Twitter / X</Label>
+                          <Input
+                            id="twitter_url"
+                            name="twitter_url"
+                            type="url"
+                            placeholder="https://twitter.com/yourhandle"
+                            value={formData.twitter_url}
+                            onChange={handleInputChange}
+                            disabled={!isEditing}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="linkedin_url">LinkedIn</Label>
+                          <Input
+                            id="linkedin_url"
+                            name="linkedin_url"
+                            type="url"
+                            placeholder="https://www.linkedin.com/in/yourprofile"
+                            value={formData.linkedin_url}
+                            onChange={handleInputChange}
+                            disabled={!isEditing}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="github_url">GitHub</Label>
+                          <Input
+                            id="github_url"
+                            name="github_url"
+                            type="url"
+                            placeholder="https://github.com/yourusername"
+                            value={formData.github_url}
+                            onChange={handleInputChange}
+                            disabled={!isEditing}
+                          />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+                )}
               </Tabs>
             </div>
           </div>

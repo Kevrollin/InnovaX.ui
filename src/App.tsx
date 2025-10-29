@@ -15,6 +15,9 @@ import Signup from "./pages/auth/Signup";
 import DonorDashboard from "./pages/donor/DonorDashboard";
 import DonorProfile from "./pages/donor/DonorProfile";
 import StudentDashboard from "./pages/student/StudentDashboard";
+import CreateProject from "./pages/student/CreateProject";
+import StudentProfile from "./pages/student/StudentProfile";
+import EditProject from "./pages/student/EditProject";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import UserManagement from "./pages/admin/UserManagement";
 import StudentVerifications from "./pages/admin/StudentVerifications";
@@ -25,6 +28,7 @@ import AdminActivityLogs from "./pages/admin/AdminActivityLogs";
 import AdminSystemSettings from "./pages/admin/AdminSystemSettings";
 import AdminCampaigns from "./pages/admin/AdminCampaigns";
 import CampaignDetail from "./pages/CampaignDetail";
+import ProjectDetail from "./pages/ProjectDetail";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -124,6 +128,7 @@ const AppContent = () => {
         {/* Regular user routes - redirect admins away */}
         <Route path="/" element={<AdminRedirect><Landing /></AdminRedirect>} />
         <Route path="/projects" element={<AdminRedirect><Projects /></AdminRedirect>} />
+        <Route path="/projects/:id" element={<AdminRedirect><ProjectDetail /></AdminRedirect>} />
         <Route path="/campaigns" element={<AdminRedirect><Campaigns /></AdminRedirect>} />
         <Route path="/campaigns/:id" element={<AdminRedirect><CampaignDetail /></AdminRedirect>} />
         <Route 
@@ -152,6 +157,36 @@ const AppContent = () => {
             <AdminRedirect>
               <AuthGuard requiredRole="STUDENT">
                 <StudentDashboard />
+              </AuthGuard>
+            </AdminRedirect>
+          } 
+        />
+        <Route 
+          path="/student/profile" 
+          element={
+            <AdminRedirect>
+              <AuthGuard requiredRole="STUDENT">
+                <StudentProfile />
+              </AuthGuard>
+            </AdminRedirect>
+          } 
+        />
+        <Route 
+          path="/student/create-project" 
+          element={
+            <AdminRedirect>
+              <AuthGuard requiredRole="STUDENT">
+                <CreateProject />
+              </AuthGuard>
+            </AdminRedirect>
+          } 
+        />
+        <Route 
+          path="/student/projects/:id/edit" 
+          element={
+            <AdminRedirect>
+              <AuthGuard requiredRole="STUDENT">
+                <EditProject />
               </AuthGuard>
             </AdminRedirect>
           } 

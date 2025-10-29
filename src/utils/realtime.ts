@@ -13,19 +13,39 @@ export const triggerDonationStatusUpdate = () => {
   window.dispatchEvent(new CustomEvent('donation-updated'));
 };
 
-export const triggerProjectLike = () => {
-  console.log('Triggering project like event');
-  window.dispatchEvent(new CustomEvent('project-liked'));
+export const triggerProjectLike = (projectId?: string) => {
+  console.log('Triggering project like event', projectId);
+  window.dispatchEvent(new CustomEvent('project-liked', { detail: { projectId } }));
 };
 
-export const triggerProjectUnlike = () => {
-  console.log('Triggering project unlike event');
-  window.dispatchEvent(new CustomEvent('project-unliked'));
+export const triggerProjectUnlike = (projectId?: string) => {
+  console.log('Triggering project unlike event', projectId);
+  window.dispatchEvent(new CustomEvent('project-unliked', { detail: { projectId } }));
+};
+
+export const triggerProjectShare = (projectId?: string) => {
+  console.log('Triggering project share event', projectId);
+  window.dispatchEvent(new CustomEvent('project-shared', { detail: { projectId } }));
+};
+
+export const triggerProjectView = (projectId?: string) => {
+  console.log('Triggering project view event', projectId);
+  window.dispatchEvent(new CustomEvent('project-viewed', { detail: { projectId } }));
 };
 
 export const triggerWalletUpdate = () => {
   console.log('Triggering wallet update event');
   window.dispatchEvent(new CustomEvent('wallet-updated'));
+};
+
+export const triggerProjectUpdate = (projectId?: string) => {
+  console.log('Triggering project update event', projectId);
+  window.dispatchEvent(new CustomEvent('project-updated', { detail: { projectId } }));
+};
+
+export const triggerProjectStatusChange = (projectId?: string, status?: string) => {
+  console.log('Triggering project status change event', projectId, status);
+  window.dispatchEvent(new CustomEvent('project-status-changed', { detail: { projectId, status } }));
 };
 
 // Generic function to trigger any custom event
