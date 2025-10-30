@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://typescript-backend-flame.vercel.app/api/$1"
+    }
+  ],
+  "env": {
+    "VITE_API_BASE_URL": "https://typescript-backend-flame.vercel.app"
+  }
+}
